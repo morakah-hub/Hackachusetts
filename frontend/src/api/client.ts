@@ -4,6 +4,7 @@ import type {
   LibraryItem,
   LiveState,
   ObjectModel,
+  PerceptionMode,
   Problem,
   Run,
   Scene,
@@ -37,7 +38,7 @@ async function request<T>(method: string, path: string, body?: unknown, signal?:
     });
   } catch (err) {
     if ((err as Error).name === "AbortError") throw err;
-    throw new ApiError(0, null, "Cannot reach the studio server. Is studio.py running?");
+    throw new ApiError(0, null, "Cannot reach the simulation server. Is the Armstrong Studio window still open?");
   }
   if (!res.ok) {
     let parsed: ApiErrorBody | null = null;
@@ -71,7 +72,7 @@ export const api = {
   updateObject: (id: string, body: Partial<{ x: number; y: number; yaw: number; name: string; mass: number; color: string }>) =>
     request<SceneObject>("PATCH", `/api/scene/objects/${encodeURIComponent(id)}`, body),
   deleteObject: (id: string) => request<{ ok: boolean }>("DELETE", `/api/scene/objects/${encodeURIComponent(id)}`),
-  resetScene: (mode: "default" | "empty") => request<Scene>("POST", "/api/scene/reset", { mode }),
+  resetScene: (mode: "default" | "empty" | "objects") => request<Scene>("POST", "/api/scene/reset", { mode }),
   restoreScene: () => request<Scene>("POST", "/api/scene/restore"),
 
   addLibraryItem: (body: ObjectModel) => request<LibraryItem>("POST", "/api/library", body),
@@ -109,4 +110,7 @@ export const api = {
   dismiss: () => request("POST", "/api/run/dismiss"),
   speed: (value: number) => request("POST", "/api/run/speed", { value }),
   resetRobot: () => request("POST", "/api/robot/reset"),
+  setPerception: (mode: PerceptionMode) => request<{ perception_mode: PerceptionMode }>("POST", "/api/settings", { perception_mode: mode }),
+  setFaults: (body: { camera_masked?: boolean; gripper_disabled?: boolean }) => request("POST", "/api/faults", body),
+  exportUrl: (runId: string) => `/api/runs/${encodeURIComponent(runId)}/export`,
 };

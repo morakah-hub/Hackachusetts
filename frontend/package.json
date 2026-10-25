@@ -1,8 +1,8 @@
 {
-  "name": "armstrong",
+  "name": "armstrong-studio",
   "private": true,
-  "version": "0.1.0",
-  "description": "Browser frontend for ArmStrong: place objects on a reach-sized table and run robot tasks in a MuJoCo simulation.",
+  "version": "1.0.0",
+  "description": "Browser frontend for Armstrong Studio: a simulated robot arm that assembles, stacks and sorts objects.",
   "type": "module",
   "scripts": {
     "dev": "vite",

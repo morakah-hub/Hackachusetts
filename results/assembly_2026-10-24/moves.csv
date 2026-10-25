@@ -1,0 +1,9 @@
+run,scenario,move,object,label,status,placement_error_mm,height_error_mm,tilt_deg,camera_estimate_error_mm,lift_mm,grasp_width_mm,sim_time_s,transport,failure
+1,Bridge,1,Beam,Clear the build spot: move Beam,done,0.73,-0.11,0.0,0.26,112.1,39.3,17.33,arc,
+1,Bridge,2,Pillar A,Place Pillar A (left side of the bridge),done,1.36,-0.11,0.0,1.63,111.9,39.2,16.62,arc,
+1,Bridge,3,Pillar B,Place Pillar B (right side of the bridge),done,0.55,-0.11,0.0,1.73,111.8,39.2,16.72,arc,
+1,Bridge,4,Beam,Lay Beam across the pillars,done,1.06,-0.29,0.02,2.33,181.8,39.3,17.25,arc,
+2,Tower,1,Base block,Put Base block on the build spot,done,0.44,-0.11,0.0,0.34,141.7,54.4,16.08,arc,
+2,Tower,2,Middle block,Stack Middle block on Base block,done,0.06,-0.35,0.0,0.99,186.9,47.3,15.94,arc,
+2,Tower,3,Top block,Stack Top block on Middle block,done,0.37,-0.62,0.0,0.63,232.3,39.2,15.43,arc,
+3,Crown,1,Top block,Put Top block on Beam,done,0.48,-0.25,0.04,0.62,112.0,39.2,14.38,arc,

@@ -1,9 +1,20 @@
-node_modules/
-frontend/dist/
+# Local environments and tools (created by start.ps1)
 .venv/
+.tools/
+frontend/node_modules/
+# Your table layout, library and uploads
+runtime/
+# Python / test caches
 __pycache__/
+*.pyc
 .pytest_cache/
-/build/
-/dist/
-# Local backup archive (383 MB, over GitHub's 100 MB file limit)
-/backend.zip
+# Logs
+*.log
+MUJOCO_LOG.TXT
+# Editors / OS
+.vscode/
+.idea/
+.claude/
+Thumbs.db
+.DS_Store
+# frontend/dist is committed on purpose: the app runs without Node.js.

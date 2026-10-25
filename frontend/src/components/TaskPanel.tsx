@@ -1,5 +1,8 @@
 import type { SceneObject, TaskDef, TaskParam } from "../api/types";
-import { isRunActive, useStudio } from "../store";
+
+const NO_OBJECTS: SceneObject[] = [];
+import { isRunActive, needsPick, useStudio } from "../store";
+import { CameraCard } from "./CameraCard";
 import { TaskIcon } from "./Icons";
 import { RunPanel } from "./RunPanel";
 
@@ -49,11 +52,20 @@ function PointField({ p, value, active }: { p: TaskParam; value: unknown; active
         <span>{p.label}</span>
         <div className="param-row">
           <span className="param-value">
-            {pt ? `${Math.round(Math.hypot(pt[0], pt[1]) * 1000)} mm from the base, ${Math.round((Math.atan2(pt[1], pt[0]) * 180) / Math.PI)}°` : "Not chosen yet"}
+            {pt
+              ? `${Math.round(Math.hypot(pt[0], pt[1]) * 1000)} mm from the base, ${Math.round((Math.atan2(pt[1], pt[0]) * 180) / Math.PI)}°`
+              : p.optional
+                ? "Default: in front of the robot"
+                : "Not chosen yet"}
           </span>
           <button className={`btn btn-sm${active ? " btn-primary" : ""}`} onClick={() => st.setActiveParam(active ? null : p.key)} aria-pressed={active}>
             {active ? "Click the table…" : pt ? "Change" : "Choose on table"}
           </button>
+          {pt && p.optional && (
+            <button className="btn btn-sm btn-ghost" onClick={() => st.setParam(p.key, undefined)}>
+              Clear
+            </button>
+          )}
         </div>
         <details className="coords">
           <summary>Enter the position instead</summary>
@@ -119,12 +131,12 @@ function ChoiceField({ p, value }: { p: TaskParam; value: unknown }) {
 
 function TaskForm({ def }: { def: TaskDef }) {
   const task = useStudio((s) => s.task);
-  const objects = useStudio((s) => s.scene?.objects ?? []);
+  const objects = useStudio((s) => s.scene?.objects ?? NO_OBJECTS);
   const plan = useStudio((s) => s.plan);
   const planning = useStudio((s) => s.planning);
   const starting = useStudio((s) => s.starting);
   const st = useStudio.getState();
-  const missing = def.params.filter((p) => (p.type === "object" || p.type === "point") && task.params[p.key] === undefined);
+  const missing = def.params.filter((p) => needsPick(p) && task.params[p.key] === undefined);
 
   return (
     <div className="task-form">
@@ -211,8 +223,8 @@ function RobotCard() {
         <dd>
           {Math.round(r.limits.min_grasp_width_m * 1000)}–{Math.round(r.limits.max_grasp_width_m * 1000)} mm wide objects
         </dd>
-        <dt>Table</dt>
-        <dd>⌀ {(2 * w.table_radius).toFixed(2)} m, sized to the reach</dd>
+        <dt>Control</dt>
+        <dd>{config.controller_name}</dd>
       </dl>
       {!atHome && !running && (
         <button className="btn btn-sm" onClick={() => useStudio.getState().resetRobot()}>
@@ -259,6 +271,7 @@ export function TaskPanel() {
           {def ? <TaskForm def={def} /> : <p className="muted">Choose a task. The robot only does what it can safely reach and lift.</p>}
         </section>
       )}
+      <CameraCard />
     </aside>
   );
 }

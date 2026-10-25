@@ -1,4 +1,4 @@
-/* ArmStrong: charcoal surfaces, one teal accent, readable type. */
+/* Armstrong Studio (Workcell Studio design): charcoal surfaces, one teal accent, readable type. */
 :root {
   --bg: #16191d;
   --panel: #1d2126;
@@ -69,11 +69,7 @@ select {
 }
 .mono {
   font-family: "Cascadia Mono", "Consolas", ui-monospace, monospace;
-}
-.text-bad {
-  color: var(--bad);
-}
-code {
+}code {
   background: var(--raised);
   padding: 1px 5px;
   border-radius: 4px;
@@ -154,13 +150,6 @@ h2 {
   display: flex;
   align-items: center;
   gap: 10px;
-}
-.brand-logo {
-  width: 30px;
-  height: 30px;
-  flex: none;
-  display: block;
-  filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.35));
 }
 .brand-name {
   font-weight: 700;
@@ -459,6 +448,7 @@ h2 {
 }
 .row-actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 6px;
   margin-top: 10px;
 }
@@ -1198,4 +1188,87 @@ details summary {
   .progress > div {
     transition: none;
   }
+}
+
+/* ------------------------------------------------------------------ Armstrong Studio additions */
+
+.camera-card .cam-frame {
+  position: relative;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  background: #0d0f12;
+  aspect-ratio: 4 / 3;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--line-soft);
+}
+
+.camera-card .cam-frame img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.camera-card .cam-toggle {
+  position: absolute;
+  right: 6px;
+  bottom: 6px;
+  background: rgba(22, 25, 29, 0.85);
+}
+
+.camera-card .field {
+  margin-top: 8px;
+}
+
+.event-log {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  max-height: 180px;
+  overflow-y: auto;
+}
+
+.event-log .ev {
+  padding: 2px 0;
+  border-bottom: 1px solid var(--line-soft);
+  word-break: break-word;
+}
+
+.event-log .ev-warn {
+  color: var(--warn);
+}
+
+.event-log .ev-error {
+  color: var(--bad);
+}
+
+.help-steps {
+  padding-left: 20px;
+  display: grid;
+  gap: 10px;
+}
+
+kbd {
+  font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+  font-size: 12px;
+  background: var(--raised);
+  border: 1px solid var(--line);
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  padding: 0 5px;
+}
+
+.help-btn {
+  margin-right: 10px;
+}
+
+.export-link {
+  align-self: flex-start;
+  text-decoration: none;
+  margin-top: 6px;
+}
+
+.text-bad {
+  color: var(--bad);
 }

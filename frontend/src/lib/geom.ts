@@ -1,4 +1,4 @@
-// Client-side copies of the server's placement rules (studio/scene.py), used only for instant feedback while
+// Client-side copies of the server's placement rules (backend/armstrong/store.py), used only for instant feedback while
 // dragging. The server re-checks every edit and its answer is the one that counts.
 import type { ObjectLimits, QuatWXYZ, SceneObject, Vec3, World } from "../api/types";
 
@@ -61,7 +61,7 @@ export function placementIssue(
   const th = (Math.atan2(y, x) * 180) / Math.PI;
   if (r < world.r_in) return "Too close to the robot base";
   if (r > world.r_out) return "Out of the arm's reach";
-  if (Math.abs(th) > world.theta_max_deg + 1e-6) return "Behind the robot (kept clear)";
+  if (Math.abs(th) > world.theta_max_deg + 1e-6) return "Outside the work area";
   const corners = footprint(x, y, yaw, size);
   if (corners.some(([cx, cy]) => Math.hypot(cx, cy) > world.table_radius - 0.005)) return "Over the table edge";
   const fp = footprint(x, y, yaw, size, gap / 2);

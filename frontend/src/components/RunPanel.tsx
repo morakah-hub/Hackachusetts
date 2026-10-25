@@ -1,4 +1,5 @@
 import type { Run } from "../api/types";
+import { api } from "../api/client";
 import { secs } from "../lib/format";
 import { useStudio } from "../store";
 
@@ -101,7 +102,11 @@ export function RunPanel({ run }: { run: Run }) {
       {run.state === "succeeded" && (
         <div className="plan plan-ok">
           <p className="plan-title">Task completed in the simulation.</p>
-          {errors.length > 0 && <p>Largest placement error: {Math.max(...errors).toFixed(1)} mm (limit 10 mm).</p>}
+          {errors.length > 0 && (
+            <p>
+              Largest placement error: {Math.max(...errors).toFixed(1)} mm (limit {config?.place_tol_mm ?? 15} mm).
+            </p>
+          )}
         </div>
       )}
       {active ? (
@@ -141,15 +146,22 @@ export function RunPanel({ run }: { run: Run }) {
           </button>
         </div>
       )}
+      {!active && (
+        <a className="btn btn-ghost btn-sm export-link" href={api.exportUrl(run.id)} download>
+          Download the run record (JSON)
+        </a>
+      )}
       <details className="dev">
         <summary>Simulation details</summary>
         <ul className="small mono">
           <li>Physics: {config?.physics.engine}, {(config?.physics.timestep_s ?? 0) * 1000} ms steps</li>
-          <li>Arm controller: {config?.controller === "torque_ctc" ? "computed torque + disturbance observer" : config?.controller}</li>
+          <li>Arm controller: {config?.controller_name}</li>
+          <li>Objects located with: {run.perception_mode === "camera_rgbd" ? "RGB-D camera (image-based estimate)" : "simulator poses (development mode)"}</li>
           {run.legs.map((l, i) =>
             l.result ? (
               <li key={i}>
                 Move {i + 1}: {l.result.success ? "ok" : `failed at ${l.result.stage}`}, sim {l.result.sim_time_s} s, wall {l.result.wall_time_s} s,
+                {typeof l.result.estimate_error_mm === "number" ? ` camera error ${l.result.estimate_error_mm.toFixed(1)} mm,` : ""}
                 carried along {l.result.transport ?? "–"}
                 {l.grasp ? `, grip ${Math.round(l.grasp.width_mm)} mm at ${Math.round((l.grasp.yaw * 180) / Math.PI)}°` : ""}
               </li>

@@ -1,0 +1,10 @@
+# Armstrong Studio (tested on Windows 11 with Python 3.13.7, 24 Oct 2026). start.bat installs these into .venv.
+mujoco==3.17.0
+numpy==2.5.4
+scipy==1.18.1
+fastapi==0.162.0
+uvicorn==0.54.0
+pillow==13.0.0
+# For the test suite (scripts\test.ps1)
+httpx==0.28.1
+pytest==9.1.1

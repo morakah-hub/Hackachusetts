@@ -241,7 +241,7 @@ export class SceneView {
       back.position.z = z;
       back.renderOrder = 1;
       this.zone.add(back);
-      const tag = this.makeLabel("Kept clear behind the robot", "label label-muted");
+      const tag = this.makeLabel("Outside the work area", "label label-muted");
       tag.position.set(-(world.r_in + world.table_radius) / 2 - 0.05, 0, z + 0.01);
       this.zone.add(tag);
     }
@@ -432,12 +432,13 @@ export class SceneView {
           new THREE.BoxGeometry(o.size[0], o.size[1], o.size[2]),
           new THREE.MeshBasicMaterial({ color, transparent: true, opacity: done ? 0.05 : 0.16, depthWrite: false }),
         );
+        const yaw = typeof leg.yaw === "number" ? leg.yaw : o.yaw;
         g.position.copy(to);
-        g.rotation.z = o.yaw;
+        g.rotation.z = yaw;
         this.planGroup.add(g);
         const edges = new THREE.LineSegments(new THREE.EdgesGeometry(g.geometry), new THREE.LineBasicMaterial({ color, transparent: true, opacity: done ? 0.2 : 0.8 }));
         edges.position.copy(to);
-        edges.rotation.z = o.yaw;
+        edges.rotation.z = yaw;
         this.planGroup.add(edges);
       }
       const tag = this.makeLabel(String(i + 1), `step-tag${i === activeIndex ? " step-tag-active" : ""}${done ? " step-tag-done" : ""}`);

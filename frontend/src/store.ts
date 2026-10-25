@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { api, ApiError } from "./api/client";
-import type { LibraryItem, LiveState, ObjectModel, Scene, StudioConfig, TaskDef, TaskPlan } from "./api/types";
+import type { LibraryItem, LiveState, ObjectModel, PerceptionMode, Scene, StudioConfig, TaskDef, TaskParam, TaskPlan } from "./api/types";
 import { findFreeSpot } from "./lib/geom";
 
 export interface Toast {
@@ -37,6 +37,8 @@ interface StudioState {
   toasts: Toast[];
   /** Bumped to ask the 3D view to frame the table again. */
   viewRequest: { kind: "reset" | "top"; n: number };
+  /** The "How to use" guide. */
+  helpOpen: boolean;
 
   init(): Promise<void>;
   refreshScene(): Promise<void>;
@@ -67,7 +69,10 @@ interface StudioState {
   dismissRun(): Promise<void>;
   setSpeed(v: number): Promise<void>;
   resetRobot(): Promise<void>;
-  resetScene(mode: "default" | "empty"): Promise<void>;
+  resetScene(mode: "default" | "empty" | "objects"): Promise<void>;
+  setPerception(mode: PerceptionMode): Promise<void>;
+  setFaults(body: { camera_masked?: boolean; gripper_disabled?: boolean }): Promise<void>;
+  setHelp(open: boolean): void;
   restoreScene(): Promise<void>;
   requestView(kind: "reset" | "top"): void;
 
@@ -87,6 +92,9 @@ function errorToast(get: () => StudioState, err: unknown, fallback = "Something 
     get().toast("error", fallback, String(err));
   }
 }
+
+/** Required parameters that are filled by clicking in the 3D view (object or table spot). */
+export const needsPick = (p: TaskParam) => (p.type === "object" || p.type === "point") && !p.optional;
 
 export const isRunActive = (s: Pick<StudioState, "live">) => {
   const st = s.live?.run?.state;
@@ -109,6 +117,14 @@ export const useStudio = create<StudioState>((set, get) => ({
   starting: false,
   toasts: [],
   viewRequest: { kind: "reset", n: 0 },
+  helpOpen: (() => {
+    try {
+      if (new URLSearchParams(window.location.search).has("nohelp")) return false;
+      return window.localStorage.getItem("armstrong.helpSeen") !== "1";
+    } catch {
+      return true;
+    }
+  })(),
 
   async init() {
     if (initStarted) return;
@@ -266,7 +282,7 @@ export const useStudio = create<StudioState>((set, get) => ({
       const o = get().scene?.objects.find((s) => s.id === sel);
       if (o?.can_lift) params[first.key] = sel;
     }
-    const active = def?.params.find((p) => (p.type === "object" || p.type === "point") && params[p.key] === undefined)?.key ?? null;
+    const active = def?.params.find((p) => needsPick(p) && params[p.key] === undefined)?.key ?? null;
     set({ task: { id, params, active }, plan: null });
   },
 
@@ -274,7 +290,7 @@ export const useStudio = create<StudioState>((set, get) => ({
     const t = get().task;
     const params = { ...t.params, [key]: value };
     const def = get().config?.tasks.find((d) => d.id === t.id);
-    const next = def?.params.find((p) => (p.type === "object" || p.type === "point") && params[p.key] === undefined)?.key ?? null;
+    const next = def?.params.find((p) => needsPick(p) && params[p.key] === undefined)?.key ?? null;
     set({ task: { ...t, params, active: t.active === key ? next : t.active }, plan: null });
   },
 
@@ -375,6 +391,27 @@ export const useStudio = create<StudioState>((set, get) => ({
     } catch (err) {
       errorToast(get, err, "Could not restore the layout");
     }
+  },
+  async setPerception(mode) {
+    try {
+      await api.setPerception(mode);
+      get().toast("info", mode === "camera_rgbd" ? "Objects are now located with the RGB-D camera." : "Objects are now located from the simulator (development mode).");
+    } catch (err) {
+      errorToast(get, err, "Could not change the setting");
+    }
+  },
+  async setFaults(body) {
+    await api.setFaults(body).catch((e) => errorToast(get, e));
+  },
+  setHelp(open) {
+    if (!open) {
+      try {
+        window.localStorage.setItem("armstrong.helpSeen", "1");
+      } catch {
+        /* private mode: the guide just shows again next time */
+      }
+    }
+    set({ helpOpen: open });
   },
   requestView(kind) {
     set({ viewRequest: { kind, n: get().viewRequest.n + 1 } });

@@ -98,8 +98,11 @@ export function LibraryPanel() {
           <p className="muted">The table is empty.</p>
         )}
         <div className="row-actions">
-          <button className="btn btn-ghost btn-sm" disabled={running} onClick={() => st.resetScene("default")}>
-            Sample layout
+          <button className="btn btn-ghost btn-sm" disabled={running} onClick={() => st.resetScene("default")} title="Two pillars, a beam and three blocks: everything the Assemble task needs">
+            Assembly kit
+          </button>
+          <button className="btn btn-ghost btn-sm" disabled={running} onClick={() => st.resetScene("objects")} title="A few everyday objects">
+            Everyday objects
           </button>
           <button className="btn btn-ghost btn-sm" disabled={running || !scene?.objects.length} onClick={() => st.resetScene("empty")}>
             Clear table

@@ -3,6 +3,15 @@ const common = { width: 20, height: 20, viewBox: "0 0 20 20", fill: "none", stro
 
 export function TaskIcon({ id }: { id: string }) {
   switch (id) {
+    case "assemble":
+      return (
+        <svg {...common}>
+          <rect x="4" y="9" width="3" height="8" rx="0.6" />
+          <rect x="13" y="9" width="3" height="8" rx="0.6" />
+          <rect x="2.5" y="5.5" width="15" height="3" rx="0.6" />
+          <path d="M10 1.8v2.4" />
+        </svg>
+      );
     case "move":
       return (
         <svg {...common}>

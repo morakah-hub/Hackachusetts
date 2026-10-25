@@ -1,4 +1,4 @@
-// Types of the ArmStrong API (backend/robotics-lab/robotics-lab/studio/server.py).
+// Types of the Armstrong Studio API (backend/armstrong/api.py).
 // World frame: right-handed, z up, metres. Quaternions from the server are MuJoCo order (w, x, y, z).
 
 export type Vec3 = [number, number, number];
@@ -50,6 +50,8 @@ export interface TaskParam {
   label: string;
   choices?: [string, string][];
   default?: string;
+  /** May be left empty (the server picks a sensible default). */
+  optional?: boolean;
 }
 
 export interface TaskDef {
@@ -69,6 +71,9 @@ export interface StudioConfig {
   phases: { id: string; label: string }[];
   phase_labels: Record<string, string>;
   controller: string;
+  controller_name: string;
+  place_tol_mm: number;
+  camera: { width: number; height: number };
   physics: { timestep_s: number; engine: string };
   workspace: {
     measured_at: string;
@@ -134,6 +139,8 @@ export interface PlanLeg {
   label: string;
   from: Vec3;
   to: Vec3;
+  /** Object heading at the placement (rad). */
+  yaw?: number;
   ok: boolean;
   problems: Problem[];
   grasp: { yaw: number; width_mm: number; depth_mm: number; lift_mm: number } | null;
@@ -156,6 +163,11 @@ export interface LegResult {
   success: boolean;
   stage: string | null;
   reason: string | null;
+  code: string | null;
+  perception: PerceptionMode;
+  estimate_error_mm: number | null;
+  grasp_width_mm: number | null;
+  height_error_mm: number | null;
   message: string;
   hint: string;
   placement_error_mm: number | null;
@@ -189,6 +201,29 @@ export interface Run {
   failure: { leg: number; stage: string; reason: string; message: string; hint: string } | null;
   notices: string[];
   legs: RunLeg[];
+  perception_mode: PerceptionMode;
+  wall_time?: number;
+}
+
+export type PerceptionMode = "camera_rgbd" | "known_world";
+
+export interface ObjectEstimate {
+  id: string;
+  valid: boolean;
+  reasons: string[];
+  position_m: Vec3 | null;
+  yaw_rad: number | null;
+  frame_id: number;
+  pixels: number;
+  source: string;
+  placement_error_xy_m?: number;
+}
+
+export interface SimEvent {
+  t_sim: number;
+  t_wall: number;
+  level: "info" | "warn" | "error";
+  msg: string;
 }
 
 export interface Frame {
@@ -208,6 +243,14 @@ export interface LiveState {
   robot_at_home: boolean;
   error: string | null;
   frame: Frame;
+  sim_time: number;
+  realtime_factor: number | null;
+  perception_mode: PerceptionMode;
+  faults: { camera_masked: boolean; gripper_disabled: boolean };
+  camera: { frame_id: number; age_s: number; masked: boolean; width: number; height: number } | null;
+  estimate: ObjectEstimate | null;
+  events: SimEvent[];
+  controller: { name: string; gains: Record<string, number>; rate_hz: number };
 }
 
 export interface GeometryGeom {
