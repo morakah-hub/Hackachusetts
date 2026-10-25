@@ -1,0 +1,80 @@
+<h1 class="chapter" id="ch-react">Reactive planning and autonomous manipulation</h1>
+
+<p class="chapter-intro">How the existing pieces (torque MPC, planner, trajectory generator, collision checker) could be combined with perception, safety monitoring, replanning, grasping and high-level decision making, and the engineering problems that stand in the way. All of it is proposal.</p>
+
+<div class="box proposal"><span class="lbl">Status</span><p>None of the architecture in this chapter is implemented. It is a design discussion grounded in the current code.</p></div>
+
+<h2 id="s-stack">A layered autonomy stack</h2>
+<figure id="fig-stack">
+<svg class="diagram" width="620" height="270" viewBox="0 0 620 270" xmlns="http://www.w3.org/2000/svg">
+<defs><marker id="a19" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><path d="M0,0 L7,3.5 L0,7 z" fill="#56636f"/></marker></defs>
+<g font-size="10">
+<rect x="20" y="10" width="580" height="36" rx="4" fill="#fdf4e6" stroke="#b87414"/><text x="30" y="32">Task layer: AI agent / task planner — "pick the red block, place it in the bin" → sequence of goals (≤ 1 Hz) <tspan fill="#c0392b">[new]</tspan></text>
+<rect x="20" y="56" width="280" height="36" rx="4" fill="#fdf4e6" stroke="#b87414"/><text x="30" y="78">Perception → world model (10–30 Hz) <tspan fill="#c0392b">[new]</tspan></text>
+<rect x="320" y="56" width="280" height="36" rx="4" fill="#fdf4e6" stroke="#b87414"/><text x="330" y="78">Grasp planner: hand pose + approach <tspan fill="#c0392b">[new]</tspan></text>
+<rect x="20" y="102" width="580" height="36" rx="4" fill="#f6f0fb" stroke="#7a4fa3"/><text x="30" y="124">Motion planner (RRT-Connect, CollisionChecker) — replans when the world model invalidates the path <tspan fill="#3f8f5a">[exists; replanning trigger new]</tspan></text>
+<rect x="20" y="148" width="580" height="36" rx="4" fill="#e8f3ec" stroke="#3f8f5a"/><text x="30" y="170">Trajectory generator (time scaling) — must splice new trajectories into the moving one <tspan fill="#3f8f5a">[exists; splicing new]</tspan></text>
+<rect x="20" y="194" width="400" height="36" rx="4" fill="#eaf1fa" stroke="#3a6ea8"/><text x="30" y="216">Torque MPC + observer (50 Hz / 500 Hz) <tspan fill="#3f8f5a">[exists]</tspan></text>
+<rect x="440" y="194" width="160" height="36" rx="4" fill="#fdecec" stroke="#b23b3b"/><text x="450" y="216">Safety monitor <tspan fill="#c0392b">[new]</tspan></text>
+<rect x="20" y="240" width="580" height="24" rx="4" fill="#f3f5f7" stroke="#56636f"/><text x="30" y="256">Robot (MuJoCo today; hardware later)</text>
+</g></svg>
+<figcaption>A possible layered architecture. Higher layers run slower and decide more; lower layers run faster and react. Green: exists today.</figcaption></figure>
+
+<h2 id="s-replan">World-model updates and reactive replanning</h2>
+<p>With perception updating the world model, a monitor would re-check the <em>remaining</em> part of the current path at every world-model
+update (cheap: <code>path_valid</code> on a few edges; tens of milliseconds at the measured 35–67 µs per configuration check). If it becomes
+invalid, three responses are possible, in increasing sophistication: stop safely; replan from the current state; or locally deform
+the trajectory. Replanning from a <em>moving</em> state is the hard part: today's planner assumes a start at rest at a waypoint.</p>
+
+<h2 id="s-cont">Trajectory updates and controller continuity</h2>
+<p>Swapping in a new trajectory while the arm moves must not create a jump in the reference, or the MPC will see a step and the torque
+will jerk. Standard approaches: start the new plan from the state predicted at the switching time (position <em>and</em> velocity), blend
+over a short window, or plan with the current velocity as an initial condition. The torque MPC helps here: its reference preview means
+a new reference can be fed in through <code>reference_preview</code> without restarting the controller, and its warm start keeps the
+optimization continuous. Today's rest-to-rest segments cannot represent a non-zero starting velocity.</p>
+
+<h2 id="s-safety">Safety monitoring and safe stopping</h2>
+<p>A safety monitor is an independent, simple layer that can override everything above: if the predicted state violates a limit, the
+measured distance to an obstacle drops below a threshold, or the planner fails to deliver, it commands a controlled stop. A controlled
+stop needs a stopping trajectory that is itself feasible (speed and torque limits) and collision-free; with the current speeds the
+stopping distance is short but not zero. The MPC could implement "stop" simply as a reference that holds the current position, with its
+torque limits guaranteeing feasibility of the command (not of the stop distance).</p>
+
+<h2 id="s-mpcobst">Obstacle-aware MPC</h2>
+<p>An alternative to replanning is to give the MPC itself obstacle constraints, for example linearized distance constraints
+$d(q_k) \ge c$ approximated as $d(\bar q_k) + \nabla d(\bar q_k)^T(q_k - \bar q_k) \ge c$ around the previous plan. This keeps the QP convex
+but is only locally valid, and the 0.5 s horizon cannot find detours around large obstacles. In practice it complements a global planner
+(the planner finds the route; the MPC keeps a margin locally). It would require distance gradients, which MuJoCo can provide through
+<code>mj_geomDistance</code>'s witness points.</p>
+
+<h2 id="s-grasp">Grasp planning and contact-rich manipulation</h2>
+<p>Grasping adds requirements the current system lacks:</p>
+<ul>
+<li><strong>Orientation.</strong> IK must solve for the full hand pose (6-D), not just position.</li>
+<li><strong>Intentional contact.</strong> The collision checker must allow fingers to touch the object being grasped (contact exclusions per phase).</li>
+<li><strong>Gripper control.</strong> Actuator 8 must close with controlled force; finger states are currently frozen in the prediction and
+collision models.</li>
+<li><strong>Changing dynamics.</strong> A grasped object changes the arm's payload. The disturbance observer would partially absorb an unknown payload
+(it did for a 30 N downward load ≈ 3 kg, Chapter 9), and the object must join the robot's collision geometry.</li>
+<li><strong>Contact-rich control.</strong> Pushing, inserting or wiping need force or impedance control (regulating contact forces rather than positions),
+which neither the CTC nor the MPC currently provides.</li>
+</ul>
+
+<h2 id="s-agents">High-level AI agents</h2>
+<p>A language-model or learned task planner could decide <em>what</em> to do ("clear the table") and emit goals to the motion layer. The
+clean interface is narrow: goals (target poses, grasp/release commands) go down; status (reached, rejected with reason, failed) comes up.
+The existing motion layer already returns explicit rejection reasons ("collision on path", "IK did not converge"), which is exactly the kind
+of feedback such an agent needs. Safety must remain in the lower layers: an agent's request should never bypass the collision checker or the
+torque limits.</p>
+
+<h2 id="s-challenges">The engineering challenges</h2>
+<table id="tab-challenges">
+<caption>Main challenges for a reactive, manipulating system.</caption>
+<thead><tr><th>Challenge</th><th>Why it is hard</th><th>Relevant existing piece</th></tr></thead>
+<tbody>
+<tr><td>Latency</td><td>Perception (30–100 ms) and planning (0.2–0.7 s measured) are slow compared with motion; the world changes meanwhile</td><td>Planning times measured in E6/E8</td></tr>
+<tr><td>Controller continuity</td><td>Reference switches must be smooth in position, velocity and acceleration</td><td>MPC preview and warm start</td></tr>
+<tr><td>Perception uncertainty</td><td>Geometry errors must be absorbed by margins; occluded space is unknown</td><td>Clearance certificate (Chapter 11) would need an extra error term</td></tr>
+<tr><td>Safe stopping</td><td>A stop needs time and space; it must itself be feasible and collision-free</td><td>Trajectory generator, torque limits</td></tr>
+<tr><td>Verification</td><td>Reactive systems have far more behaviours to test than a fixed plan</td><td>Benchmark harness, seeds, exact clearance metric</td></tr>
+</tbody></table>

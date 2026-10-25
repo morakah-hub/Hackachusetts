@@ -1,0 +1,185 @@
+<div class="part">Part II — The Robotics Mathematics<small>Kinematics (where the robot is), dynamics (how forces make it move), and feedback control (how to make it go where we want).</small></div>
+
+<h1 class="chapter" id="ch-kin">Robot mechanics and kinematics</h1>
+
+<p class="chapter-intro">Kinematics is the geometry of motion without forces: given the joint angles, where is the hand? Given a desired hand position, which joint angles reach it? How do small joint motions move the hand?</p>
+
+<h2 id="s-dof">Joints and degrees of freedom</h2>
+<p><strong>Intuition.</strong> Your arm is a chain of rigid bones connected by joints. Each joint allows one kind of
+relative motion. A door hinge allows rotation about one axis: one <em>degree of freedom</em> (DOF). A
+drawer slide allows translation along one axis: also one DOF. A robot arm is a chain of such joints, and the
+number of independent joint motions is its number of DOF.</p>
+<p><strong>Why it matters.</strong> A rigid object in space has 6 DOF (3 for position, 3 for orientation). To place a
+tool anywhere with any orientation, an arm needs at least 6 joints. The Panda has 7 revolute (hinge)
+joints, so for any reachable hand pose there is (generically) a one-parameter family of arm configurations;
+if only the hand <em>position</em> is specified, as in our IK, the family has 7 − 3 = 4 dimensions. This
+<em>redundancy</em> is useful (the elbow can move away from an obstacle while the hand stays put) and is
+exploited by the planner's multiple IK postures (Chapter 10).</p>
+
+<div class="box verified"><span class="lbl">Verified in source code</span>
+<p>Joint ranges of the Menagerie Panda (<span class="file">robots/models/franka_emika_panda/panda.xml</span>, lines 9–200),
+copied unchanged into the simulation:</p>
+<table class="small"><thead><tr><th>joint</th><th>1</th><th>2</th><th>3</th><th>4</th><th>5</th><th>6</th><th>7</th></tr></thead>
+<tbody><tr><td>min (rad)</td><td>−2.8973</td><td>−1.7628</td><td>−2.8973</td><td>−3.0718</td><td>−2.8973</td><td>−0.0175</td><td>−2.8973</td></tr>
+<tr><td>max (rad)</td><td>2.8973</td><td>1.7628</td><td>2.8973</td><td>−0.0698</td><td>2.8973</td><td>3.7525</td><td>2.8973</td></tr>
+<tr><td>v_max (rad/s)</td><td>2.175</td><td>2.175</td><td>2.175</td><td>2.175</td><td>2.61</td><td>2.61</td><td>2.61</td></tr></tbody></table>
+<p>The fingers are two slide joints (0–0.04 m) coupled by an equality constraint and driven by actuator 8;
+in every task the gripper is held open (command 255).</p></div>
+
+<h2 id="s-frames">Coordinate frames and rotation matrices</h2>
+<p><strong>Intuition.</strong> To say where something is, you need a reference: an origin and three perpendicular
+axes. Robotics attaches such a <em>frame</em> to the world and one to every link. The pose of a link is the
+position and orientation of its frame relative to its parent's frame.</p>
+<p><strong>Mathematics.</strong> Orientation is described by a <strong>rotation matrix</strong> $R \in \mathbb{R}^{3\times3}$ whose
+columns are the link frame's $x$, $y$, $z$ axes written in the parent frame. A rotation by angle $\theta$
+about the $z$ axis is</p>
+\[ R_z(\theta) = \begin{bmatrix} \cos\theta & -\sin\theta & 0 \\ \sin\theta & \cos\theta & 0 \\ 0 & 0 & 1 \end{bmatrix}. \]
+<p>Rotation matrices are <em>orthonormal</em>: $R^T R = I$ and $\det R = 1$, so $R^{-1} = R^T$. A vector $p_B$
+expressed in frame B is expressed in frame A as $p_A = R_{AB}\, p_B$. Composing rotations is matrix
+multiplication: $R_{AC} = R_{AB} R_{BC}$, and the order matters. MuJoCo stores orientations internally as
+unit quaternions $(w, x, y, z)$ (four numbers, no singularities) and also provides rotation matrices
+(<code>data.xmat</code>, <code>data.site_xmat</code>).</p>
+<p>The angle between two orientations $R_a$ and $R_b$ is the angle of the relative rotation $R_a^T R_b$.
+The project computes it in <code>rotation_angle</code> (<span class="file">simulation/kinematics.py</span>, line 30) as
+$2\,\mathrm{atan2}(\|v\|, |w|)$ from the quaternion $(w, v)$ of $R_a^T R_b$, which is numerically accurate
+near 0 and π where the textbook formula $\arccos\big((\mathrm{tr}(R_a^TR_b)-1)/2\big)$ loses precision. It
+is used for the orientation metrics of the benchmark (v0.4).</p>
+
+<h2 id="s-homog">Homogeneous transformations</h2>
+<p>A pose has a rotation and a translation. The <strong>homogeneous transformation</strong> packs both into one
+4×4 matrix so that composing poses becomes a single multiplication:</p>
+\[ T_{AB} = \begin{bmatrix} R_{AB} & p_{AB} \\ 0\;0\;0 & 1 \end{bmatrix}, \qquad
+   \begin{bmatrix} p_A \\ 1 \end{bmatrix} = T_{AB} \begin{bmatrix} p_B \\ 1 \end{bmatrix}, \qquad T_{AC} = T_{AB} T_{BC}. \]
+<p>Here $p_{AB}$ is the position of B's origin in A. For a revolute joint with angle $q_i$ about the link's
+local $z$ axis, the transform from link $i-1$ to link $i$ is a fixed offset (how the links are bolted
+together) followed by the joint rotation: $T_{i-1,i}(q_i) = T^{\text{fixed}}_{i}\; \mathrm{Rot}_z(q_i)$.</p>
+
+<h2 id="s-fk">Forward kinematics</h2>
+<p><strong>Intuition.</strong> Forward kinematics (FK) answers: if I set the joints to $q$, where is the hand? Walk down
+the chain from the base, applying each link's fixed offset and joint rotation in turn.</p>
+\[ T_{0,\text{EE}}(q) = T^{\text{fixed}}_1 R_z(q_1)\; T^{\text{fixed}}_2 R_z(q_2)\cdots T^{\text{fixed}}_7 R_z(q_7)\; T_{7,\text{EE}}. \]
+<p><strong>A planar example.</strong> Two links of lengths $L_1$, $L_2$ moving in a plane with angles
+$\theta_1$ (from the $x$ axis) and $\theta_2$ (relative to link 1):</p>
+\[ x = L_1\cos\theta_1 + L_2\cos(\theta_1+\theta_2), \qquad y = L_1\sin\theta_1 + L_2\sin(\theta_1+\theta_2). \]
+<p>The map from angles to position is nonlinear (sines and cosines) but easy to evaluate.</p>
+
+<figure id="fig-chain">
+<svg class="diagram" width="560" height="210" viewBox="0 0 560 210" xmlns="http://www.w3.org/2000/svg">
+<defs><marker id="a4" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><path d="M0,0 L7,3.5 L0,7 z" fill="#c0392b"/></marker>
+<marker id="a4b" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><path d="M0,0 L7,3.5 L0,7 z" fill="#2e8b57"/></marker></defs>
+<g font-size="10">
+<line x1="20" y1="180" x2="250" y2="180" stroke="#7f8c8d"/>
+<line x1="60" y1="180" x2="150" y2="95" stroke="#1f5f8b" stroke-width="7" stroke-linecap="round"/>
+<line x1="150" y1="95" x2="240" y2="120" stroke="#3a6ea8" stroke-width="6" stroke-linecap="round"/>
+<circle cx="60" cy="180" r="6" fill="#fff" stroke="#10324d" stroke-width="2"/><circle cx="150" cy="95" r="6" fill="#fff" stroke="#10324d" stroke-width="2"/>
+<circle cx="240" cy="120" r="4" fill="#d9822b"/>
+<line x1="60" y1="180" x2="100" y2="180" stroke="#c0392b" marker-end="url(#a4)"/><line x1="60" y1="180" x2="60" y2="140" stroke="#2e8b57" marker-end="url(#a4b)"/>
+<line x1="150" y1="95" x2="180" y2="67" stroke="#c0392b" marker-end="url(#a4)"/><line x1="150" y1="95" x2="122" y2="67" stroke="#2e8b57" marker-end="url(#a4b)"/>
+<path d="M 90 180 A 30 30 0 0 0 82 160" fill="none" stroke="#444"/><text x="94" y="168">θ₁</text>
+<path d="M 180 104 A 30 30 0 0 0 172 75" fill="none" stroke="#444" stroke-dasharray="2 2"/><text x="183" y="94">θ₂</text>
+<text x="92" y="132" fill="#1f5f8b">L₁</text><text x="196" y="102" fill="#3a6ea8">L₂</text><text x="246" y="124">EE (x, y)</text>
+<text x="20" y="200" font-size="9">frame 0 (base)</text><text x="128" y="62" font-size="9">frame 1</text>
+<text x="300" y="40" font-weight="600">Panda chain in panda.xml (body offsets, metres)</text>
+<text x="300" y="60" font-size="9.5">link1: pos (0, 0, 0.333) — joint 1 about z (shoulder yaw)</text>
+<text x="300" y="76" font-size="9.5">link2: rotated −90° about x — joint 2 (shoulder pitch)</text>
+<text x="300" y="92" font-size="9.5">link3: pos (0, −0.316, 0) — joint 3 (upper-arm roll)</text>
+<text x="300" y="108" font-size="9.5">link4: pos (0.0825, 0, 0) — joint 4 (elbow)</text>
+<text x="300" y="124" font-size="9.5">link5: pos (−0.0825, 0.384, 0) — joint 5 (forearm roll)</text>
+<text x="300" y="140" font-size="9.5">link6: rotated — joint 6 (wrist pitch)</text>
+<text x="300" y="156" font-size="9.5">link7: pos (0.088, 0, 0) — joint 7 (flange roll)</text>
+<text x="300" y="172" font-size="9.5">hand: pos (0, 0, 0.107), −45° about z; ee_site 0.1034 below</text>
+</g></svg>
+<figcaption>Left: a planar two-link arm with its frames and joint angles. Right: the Panda's kinematic chain as
+written in the Menagerie MJCF. Each body has a fixed position and orientation relative to its parent, and
+each joint rotates about the body's local $z$ axis.</figcaption>
+</figure>
+
+<p><strong>In our code.</strong> We never write these matrices out by hand. MuJoCo's <code>mj_kinematics</code> walks the
+body tree defined in the XML and computes every body, geom and site pose. <code>ArmKinematics.fk(q)</code>
+(<span class="file">simulation/kinematics.py</span>, line 79) copies the live state into a private
+<code>MjData</code>, overwrites the seven arm joints with $q$, calls <code>mj_kinematics</code>, and returns the
+position of <code>ee_site</code>; <code>fk_pose</code> also returns its rotation matrix. The engine has an
+equivalent <code>forward_kinematics</code>. Because they use scratch data, FK never disturbs the running
+simulation. At the home configuration $q = (0, 0, 0, -\pi/2, 0, \pi/2, -\pi/4)$ the end-effector site is
+at (0.554, 0, 0.921) m in the world (computed for this guide).</p>
+
+<h2 id="s-jac">Jacobians</h2>
+<p><strong>Intuition.</strong> If I nudge the joints by small amounts $\delta q$, how does the hand move? For small motions
+the answer is linear: $\delta x \approx J(q)\,\delta q$. The matrix $J$ is the <strong>Jacobian</strong>; its column
+$j$ is the hand velocity produced by moving joint $j$ alone at 1 rad/s.</p>
+<p><strong>Mathematics.</strong> Differentiate FK with respect to time: $\dot x = \frac{\partial x}{\partial q}\dot q = J(q)\dot q$.
+For the planar arm,</p>
+\[ J = \begin{bmatrix} -L_1 \sin\theta_1 - L_2\sin(\theta_1+\theta_2) & -L_2 \sin(\theta_1+\theta_2) \\
+                        \phantom{-}L_1 \cos\theta_1 + L_2\cos(\theta_1+\theta_2) & \phantom{-}L_2\cos(\theta_1+\theta_2) \end{bmatrix}. \]
+<p>For a revolute joint $j$ with unit axis $a_j$ through point $o_j$, the geometric rule is: column $j$ of the
+position Jacobian is $a_j \times (p_{\text{EE}} - o_j)$. Its length is at most the distance from the joint
+axis to the hand. The same cross-product bound reappears in Chapter 11, where it limits how far any point
+of the robot can move between collision checks.</p>
+<p>The Jacobian also maps forces: a force $F$ at the hand requires joint torques $\tau = J^T F$ (by the
+principle of virtual work, since power $F\cdot\dot x = F^T J \dot q = \tau^T\dot q$). This is how the
+disturbance experiments' 30 N push at the hand turns into joint torques.</p>
+<p><strong>In our code.</strong> <code>ArmKinematics.jacobian(q)</code> calls MuJoCo's <code>mj_jacSite</code> for the end-effector
+site and keeps the 3×7 positional block for the arm joints. <code>test_fk_matches_engine_and_jacobian_matches_finite_differences</code>
+checks it against finite differences of FK.</p>
+
+<h2 id="s-ik">Inverse kinematics</h2>
+<p><strong>Intuition.</strong> Inverse kinematics (IK) answers the reverse question: which joint angles put the hand at
+a desired position $x^*$? There is no general closed-form answer for the Panda, there may be no solution
+(target too far) or infinitely many (redundancy). The standard approach is iterative: start somewhere,
+measure the error $e = x^* - \mathrm{FK}(q)$, take a joint step that reduces it, repeat.</p>
+<p><strong>Mathematics: damped least squares.</strong> We want $\delta q$ with $J\delta q \approx e$. With 7 unknowns and 3
+equations there are many solutions; the minimum-norm one is $\delta q = J^+ e$ with the pseudoinverse
+$J^+ = J^T(JJ^T)^{-1}$. Near singular configurations $JJ^T$ is nearly singular and the step explodes.
+<em>Damped least squares</em> (DLS) instead minimizes $\|J\delta q - e\|^2 + \lambda^2\|\delta q\|^2$, whose
+solution is</p>
+\[ \delta q = J^T (J J^T + \lambda^2 I)^{-1} e. \]
+<p>The damping $\lambda$ trades accuracy for robustness: steps stay bounded even at singularities. Because the
+arm is redundant, any joint motion in the <em>null space</em> of $J$ (motions that do not move the hand) can be
+added freely. Our solver uses it to pull the posture towards a rest configuration $q_{\text{rest}}$:</p>
+\[ \delta q \mathrel{+}= k_{\text{null}}\,(I - J^+J)(q_{\text{rest}} - q). \]
+<p>Each step is limited to 0.2 rad per joint and $q$ is clamped to the joint limits minus a margin.</p>
+
+<div class="box verified"><span class="lbl">Verified in source code</span>
+<p><code>ArmKinematics.solve_ik(target, seed, tol=1e-4, max_iter=300, rest=None)</code>
+(<span class="file">simulation/kinematics.py</span>, lines 118–141) implements exactly the two equations above with
+$\lambda$ = 0.05 (config <code>ik.damping</code>), $k_{\text{null}}$ = 0.1, step limit 0.2 rad, joint-limit
+margin 0.05 rad, and converges when the position error is below 0.1 mm (configurable
+<code>ik.tolerance</code>). Orientation is left free. It returns an <code>IKResult(q, success, error, iterations, reason)</code>.
+<code>plan_target</code> (v0.3) tries the current configuration and then the rest posture as seeds and checks
+collisions; <code>planning/ik.py</code> (v0.5) tries 22 seeds and keeps several valid postures; for perturbed
+and random seeds it passes <code>rest=seed</code> so the null-space term does not drag every solution to the same
+posture.</p></div>
+
+<p><strong>Example from our project.</strong> In <span class="file">configs/reach.yaml</span>, the target
+<code>out_of_reach</code> at (1.30, 0, 0.60) m is about 1.3 m from the base; IK cannot converge and the task
+reports "IK did not converge (closest 360.6 mm)". The target <code>inside_table</code> at z = 0.38 m converges but
+is rejected by the collision check at the goal.</p>
+
+<h2 id="s-jvsc">Joint-space versus Cartesian-space motion</h2>
+<p>A motion can be straight in joint space (every joint moves linearly from start to goal, all arriving
+together) or straight in Cartesian space (the hand moves along a line). They are different. A straight line in
+joint space generally produces a <em>curved</em> hand path, because FK is nonlinear. All motions in this
+project are straight in joint space: <code>tasks/trajectory.py</code> defines each move as
+$q(t) = q_a + (q_b - q_a)\,s(t)$. This choice has three advantages: joint limits are respected automatically
+(the joint-limit box is convex, so a line between two points inside it stays inside), timing limits per joint
+are easy to apply, and collision checking can bound the motion of every robot point (Chapter 11). The
+cost is that the hand path is not a straight line; the planned paths drawn in the viewer
+(<code>planning/visualization.py</code>, <code>ee_polyline</code>) show these curves.</p>
+
+<h2 id="s-sing">Singularities and workspace limits</h2>
+<p>A configuration is <strong>singular</strong> when $J$ loses rank: some hand direction cannot be produced at all
+(for example when the arm is fully stretched, it cannot move the hand further outwards). Near a singularity
+small hand motions need very large joint velocities. The <em>singular values</em> of $J$ measure how close the arm
+is: the smallest one is the hand speed (m/s) achievable per rad/s of joint speed in the worst direction.
+Computed for this guide with <code>ArmKinematics.jacobian</code>: at home the singular values are 0.81, 0.73 and
+0.31 m/rad; at the wall demo's start 0.78, 0.73 and 0.30 m/rad, so both are comfortably non-singular.</p>
+<p>The <strong>workspace</strong> is the set of reachable hand positions. For the Panda it is roughly a sphere of radius
+about 0.85 m around the shoulder, minus regions excluded by joint limits and self-collision. Reachability is
+not checked analytically anywhere in the code; a target is unreachable when IK fails from all seeds.</p>
+
+<div class="box warning"><span class="lbl">Limitations</span>
+<ul><li>IK is position-only: the hand's orientation is whatever the solver ends at (the benchmark reports the
+hand turning by up to 49° in the reach scenario, <span class="file">docs/research/v0.4-results.md</span> §6). Grasping would need
+orientation control.</li>
+<li>IK failure from all seeds does not prove a target is unreachable; it is a numerical search.</li>
+<li>There is no Cartesian-space motion (straight-line hand paths) and no velocity-level Cartesian control.</li></ul></div>

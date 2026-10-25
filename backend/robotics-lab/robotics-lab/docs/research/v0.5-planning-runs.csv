@@ -1,0 +1,221 @@
+scenario,seed,environment,goal_type,success,status,reason,total_time_s,rrt_time_s,nodes,collision_checks,direct_edge_valid,ik_converged,ik_valid,candidate_index,candidates_tried,raw_length_rad,smoothed_length_rad,raw_vertices,smoothed_vertices,path_revalidated,revalidation_reason,path_min_clearance_mm,goal_ee_error_mm
+easy_free,0,table,cartesian,True,success,,0.09313419999671169,0.0013724999880651012,2,65,True,17,4,0,1,0.3336281689698338,0.3336281689698338,2,2,True,,100.0,0.004795497812337146
+easy_free,1,table,cartesian,True,success,,0.0857444999855943,0.0013710000057471916,2,66,True,18,4,0,1,0.3336281689698338,0.3336281689698338,2,2,True,,100.0,0.004795497812337146
+easy_free,2,table,cartesian,True,success,,0.11222969999653287,0.001546500003314577,2,64,True,16,4,0,1,0.3336281689698338,0.3336281689698338,2,2,True,,100.0,0.004795497812337146
+easy_free,3,table,cartesian,True,success,,0.07204639998963103,0.0015214000013656914,2,67,True,19,4,0,1,0.3336281689698338,0.3336281689698338,2,2,True,,100.0,0.004795497812337146
+easy_free,4,table,cartesian,True,success,,0.0846151000005193,0.0013574000040534884,2,65,True,17,4,0,1,0.3336281689698338,0.3336281689698338,2,2,True,,100.0,0.004795497812337146
+easy_free,5,table,cartesian,True,success,,0.09312399999180343,0.0018637000030139461,2,65,True,17,4,0,1,0.3336281689698338,0.3336281689698338,2,2,True,,100.0,0.004795497812337146
+easy_free,6,table,cartesian,True,success,,0.09086719999322668,0.0013103999954182655,2,65,True,17,4,0,1,0.3336281689698338,0.3336281689698338,2,2,True,,100.0,0.004795497812337146
+easy_free,7,table,cartesian,True,success,,0.08293990000674967,0.001286899991100654,2,64,True,16,4,0,1,0.3336281689698338,0.3336281689698338,2,2,True,,100.0,0.004795497812337146
+easy_free,8,table,cartesian,True,success,,0.03927469998598099,0.002163999990443699,2,68,True,20,4,0,1,0.3336281689698338,0.3336281689698338,2,2,True,,100.0,0.004795497812337146
+easy_free,9,table,cartesian,True,success,,0.06282700000156183,0.0014187000051606447,2,66,True,18,4,0,1,0.3336281689698338,0.3336281689698338,2,2,True,,100.0,0.004795497812337146
+easy_free,10,table,cartesian,True,success,,0.07793669999227859,0.0013004999927943572,2,66,True,18,4,0,1,0.3336281689698338,0.3336281689698338,2,2,True,,100.0,0.004795497812337146
+easy_free,11,table,cartesian,True,success,,0.11842590000014752,0.0015599000034853816,2,63,True,15,4,0,1,0.3336281689698338,0.3336281689698338,2,2,True,,100.0,0.004795497812337146
+easy_free,12,table,cartesian,True,success,,0.11510770001041237,0.0027962000021943823,2,64,True,16,4,0,1,0.3336281689698338,0.3336281689698338,2,2,True,,100.0,0.004795497812337146
+easy_free,13,table,cartesian,True,success,,0.12624160000996199,0.0031962999928509817,2,65,True,17,4,0,1,0.3336281689698338,0.3336281689698338,2,2,True,,100.0,0.004795497812337146
+easy_free,14,table,cartesian,True,success,,0.09756709999055602,0.0012970000097993761,2,64,True,16,4,0,1,0.3336281689698338,0.3336281689698338,2,2,True,,100.0,0.004795497812337146
+easy_free,15,table,cartesian,True,success,,0.08654489999753423,0.0013099999923724681,2,65,True,17,4,0,1,0.3336281689698338,0.3336281689698338,2,2,True,,100.0,0.004795497812337146
+easy_free,16,table,cartesian,True,success,,0.08198600000469014,0.0017396999901393428,2,65,True,17,4,0,1,0.3336281689698338,0.3336281689698338,2,2,True,,100.0,0.004795497812337146
+easy_free,17,table,cartesian,True,success,,0.10453699999197852,0.0013397000002441928,2,63,True,15,4,0,1,0.3336281689698338,0.3336281689698338,2,2,True,,100.0,0.004795497812337146
+easy_free,18,table,cartesian,True,success,,0.10461260000010952,0.0016757000121288002,2,63,True,15,4,0,1,0.3336281689698338,0.3336281689698338,2,2,True,,100.0,0.004795497812337146
+easy_free,19,table,cartesian,True,success,,0.08699039999919478,0.0013255999947432429,2,64,True,16,4,0,1,0.3336281689698338,0.3336281689698338,2,2,True,,100.0,0.004795497812337146
+wall,0,planning_demo,cartesian,True,success,,0.2311961999948835,0.04978570000093896,21,3808,False,17,4,0,1,4.38858516223948,1.4093720681441604,10,4,True,,19.59790487809245,0.011780545226023197
+wall,1,planning_demo,cartesian,True,success,,0.3001312999986112,0.045830400005797856,23,5784,False,16,4,0,1,3.3436766060738785,1.3599570592853862,9,6,True,,20.009145164358085,0.03307667248707104
+wall,2,planning_demo,cartesian,True,success,,0.2608924000087427,0.017610599999898113,10,5226,False,18,4,0,1,3.2317531333354124,1.4670598593189808,8,4,True,,15.677123626107129,0.06357432834478628
+wall,3,planning_demo,cartesian,True,success,,0.14461289999599103,0.013174899999285117,8,2392,False,18,4,0,1,1.921852147890806,1.316302676845182,6,4,True,,19.636495588761694,0.013488180396730384
+wall,4,planning_demo,cartesian,True,success,,0.2767011999967508,0.030637100004241802,14,5513,False,17,4,0,1,3.9266849060182674,1.533230048881999,8,4,True,,18.784356742973888,0.013488180396730384
+wall,5,planning_demo,cartesian,True,success,,0.23473190001095645,0.029136900004232302,15,4180,False,16,4,0,1,2.9964587531666056,1.1786183149037912,8,5,True,,18.738464421345757,0.013488180396730384
+wall,6,planning_demo,cartesian,True,success,,0.26956860000791494,0.06017189999693073,26,5067,False,16,4,0,1,3.6812001494871365,1.2925582894915217,9,4,True,,20.91228828804865,0.013488180396730384
+wall,7,planning_demo,cartesian,True,success,,0.24585420000948943,0.06304300000192598,29,5020,False,17,4,0,1,7.494897059821636,1.4252512129812074,17,4,True,,21.167700393388852,0.013488180396730384
+wall,8,planning_demo,cartesian,True,success,,0.14023100001213606,0.0435801999992691,20,2308,False,19,4,0,1,3.650621695939873,1.7074959443434066,8,3,True,,21.751997436131443,0.013488180396730384
+wall,9,planning_demo,cartesian,True,success,,0.2740180999971926,0.023563099995953962,13,5422,False,17,4,0,1,3.289362279912476,1.5665803047318798,10,6,True,,20.28937953713092,0.059735077853552074
+wall,10,planning_demo,cartesian,True,success,,0.20702229999005795,0.02807319999556057,13,3595,False,18,4,0,1,1.786907957412213,1.1224340887831625,6,4,True,,18.168125702448112,0.013488180396730384
+wall,11,planning_demo,cartesian,True,success,,0.2638111999985995,0.03885159999481402,18,5927,False,18,4,0,1,4.086719847742001,1.9073839983252405,10,5,True,,20.059828720436723,0.013488180396730384
+wall,12,planning_demo,cartesian,True,success,,0.25752709999505896,0.04214239999419078,17,4029,False,15,4,0,1,4.017610878116792,1.627473137147173,10,3,True,,22.189390533340816,0.019311429424330236
+wall,13,planning_demo,cartesian,True,success,,0.3805181000061566,0.046960799998487346,21,7191,False,17,4,0,1,4.8133124862803935,2.7616862691311272,11,4,True,,20.482230230386705,0.013488180396730384
+wall,14,planning_demo,cartesian,True,success,,0.20105690001219045,0.023328199997195043,12,2417,False,16,4,0,1,3.9541094083296913,2.2560453313624205,9,4,True,,20.86040296323962,0.013488180396730384
+wall,15,planning_demo,cartesian,True,success,,0.25633980000566225,0.05872139999701176,24,4840,False,16,4,0,1,6.259053481534124,1.5298908483683165,13,5,True,,20.773122716396266,0.013488180396730384
+wall,16,planning_demo,cartesian,True,success,,0.20643409999320284,0.02532279999286402,13,4076,False,18,4,0,1,2.3623678459764132,1.5742483013223345,6,6,True,,19.73660921101439,0.08055315926255223
+wall,17,planning_demo,cartesian,True,success,,0.30175889999372885,0.030495400002109818,14,4641,False,13,4,0,1,3.485307318259812,1.6184627066758621,9,6,True,,20.04659808001516,0.09016763294343882
+wall,18,planning_demo,cartesian,True,success,,0.30403410000144504,0.04979260000982322,22,5122,False,14,4,0,1,2.6117093742180875,1.4039388053285327,8,5,True,,18.36146418157713,0.013488180396730384
+wall,19,planning_demo,cartesian,True,success,,0.2021251999976812,0.028205000009620562,12,3622,False,18,4,0,1,3.1634224794937706,1.2554239232301085,8,4,True,,22.59135147989455,0.013488180396730384
+obstacles_blocked,0,obstacles,cartesian,True,success,,0.16871610000089277,0.021669200010364875,11,2797,False,19,4,0,1,2.761660118209963,0.8669015069815609,8,7,True,,18.57898272216327,0.06299817973522405
+obstacles_blocked,1,obstacles,cartesian,True,success,,0.18611460000101943,0.030537600003299303,14,3944,False,21,4,0,1,3.0199184733497804,1.6142273597459194,8,7,True,,21.729531959067863,0.005079051512947554
+obstacles_blocked,2,obstacles,cartesian,True,success,,0.2221748000010848,0.012500500000896864,7,2995,False,18,4,0,1,2.120460013833526,1.253694028160136,6,6,True,,20.5283534426349,0.041729120288797855
+obstacles_blocked,3,obstacles,cartesian,True,success,,0.19864090000919532,0.027876000007381663,13,2683,False,17,4,0,1,3.5574848133332098,0.6978152690959102,10,7,True,,20.014118807627845,0.06299817973522405
+obstacles_blocked,4,obstacles,cartesian,True,success,,0.22912750000250526,0.023605900001712143,11,3739,False,18,4,0,1,3.640549810876551,1.3279390652130802,10,6,True,,19.26216101338045,0.06299817973522405
+obstacles_blocked,5,obstacles,cartesian,True,success,,0.20038919999205973,0.013359000004129484,8,2996,False,17,4,0,1,2.409900253582433,0.9094772630018761,6,5,True,,20.265581808488005,0.06299817973522405
+obstacles_blocked,6,obstacles,cartesian,True,success,,0.19813499999872874,0.02351380001346115,13,2511,False,16,4,0,1,3.8610185272306765,0.7597993906939431,10,6,True,,18.985688443666085,0.06299817973522405
+obstacles_blocked,7,obstacles,cartesian,True,success,,0.2575364999938756,0.031730000002426095,16,5225,False,17,4,0,1,4.405058341760415,2.708025532354684,9,8,True,,19.898566806500796,0.06299817973522405
+obstacles_blocked,8,obstacles,cartesian,True,success,,0.1939725999982329,0.028137300003436394,11,3212,False,20,4,0,1,3.6772215328591233,1.1012127636146125,10,5,True,,17.7931265767166,0.06299817973522405
+obstacles_blocked,9,obstacles,cartesian,True,success,,0.18039719999069348,0.019398899996303953,12,3467,False,19,4,0,1,2.9922269093802214,0.7064530894461312,9,6,True,,18.788715211449308,0.06299817973522405
+obstacles_blocked,10,obstacles,cartesian,True,success,,0.1458861999999499,0.013408300001174212,9,2328,False,20,4,0,1,2.287944682710492,0.7785091644221422,8,6,True,,18.38952924060331,0.06299817973522405
+obstacles_blocked,11,obstacles,cartesian,True,success,,0.17495839999173768,0.013129500002833083,8,2345,False,17,4,0,1,1.5620068939542202,1.0573211938920124,5,6,True,,20.439789566828004,0.06299817973522405
+obstacles_blocked,12,obstacles,cartesian,True,success,,0.1752210999984527,0.01636049999797251,9,2395,False,17,4,0,1,1.5202955094923842,0.7503914705385144,5,8,True,,20.01818176510158,0.06299817973522405
+obstacles_blocked,13,obstacles,cartesian,True,success,,0.18667370000912342,0.028051700006471947,14,3685,False,20,4,0,1,3.7834745258963656,1.4647285255598188,10,5,True,,17.53149724575544,0.06299817973522405
+obstacles_blocked,14,obstacles,cartesian,True,success,,0.15859720000298694,0.017667000007349998,10,1899,False,17,4,0,1,2.6102485679523255,1.4793330562555722,7,5,True,,20.130530336486856,0.06299817973522405
+obstacles_blocked,15,obstacles,cartesian,True,success,,0.2527055999962613,0.04179860001022462,18,4212,False,18,4,0,1,4.771951013318559,0.9648207295553809,11,4,True,,19.381320275792323,0.06299817973522405
+obstacles_blocked,16,obstacles,cartesian,True,success,,0.16945129999658093,0.019065399988903664,10,2346,False,19,4,0,1,2.2283531392836604,0.8656642930158887,7,5,True,,18.035834470320513,0.06299817973522405
+obstacles_blocked,17,obstacles,cartesian,True,success,,0.29392370001005474,0.015842499997233972,9,4404,False,16,4,0,1,2.3368888368632414,1.1172647104833773,6,4,True,,22.27463887179261,0.06299817973522405
+obstacles_blocked,18,obstacles,cartesian,True,success,,0.2568927999964217,0.0203748999920208,11,3461,False,14,4,0,1,3.2899008567974826,0.9235860061558452,8,5,True,,19.53419989635817,0.06299817973522405
+obstacles_blocked,19,obstacles,cartesian,True,success,,0.17759059999661986,0.027472399990074337,15,3063,False,18,4,0,1,4.263867582993825,1.1357395904717449,11,4,True,,20.637736616621105,0.06299817973522405
+narrow_passage,0,planning_narrow,cartesian,True,success,,0.4892453999927966,0.16205470000568312,50,9851,False,18,2,0,1,15.00381093733363,8.398470514384037,28,8,True,,20.05851311201833,0.008322893379525083
+narrow_passage,1,planning_narrow,cartesian,True,success,,0.46936630000709556,0.16331309999804944,40,7446,False,17,2,0,1,4.127584197043565,2.6718115526595483,8,5,True,,21.147482415287783,0.019997158451849954
+narrow_passage,2,planning_narrow,cartesian,True,success,,3.175850799991167,0.3405664000019897,822,75318,False,19,2,1,2,13.263543243774127,7.5943338625322125,25,7,True,,20.897260336080485,0.09970153378568253
+narrow_passage,3,planning_narrow,cartesian,True,success,,0.4504309000039939,0.177708100003656,51,8587,False,19,4,0,1,11.59621437708196,7.41666982970399,23,8,True,,20.363521354972796,0.006512063785296283
+narrow_passage,4,planning_narrow,cartesian,True,success,,0.7439918000018224,0.26292710000416264,75,15979,False,17,3,0,1,19.39868636601044,7.465432240273786,37,9,True,,21.557298454206382,0.012042977131110088
+narrow_passage,5,planning_narrow,cartesian,True,success,,0.5032580999977654,0.16073920000053477,50,9348,False,17,3,0,1,7.749630432848355,3.8091207064693924,13,6,True,,20.08956481426427,0.06397176399625909
+narrow_passage,6,planning_narrow,cartesian,True,success,,1.040165899990825,0.16146820000722073,51,13633,False,16,4,0,1,14.515383655893704,7.80146969055976,26,7,True,,20.29873102337095,0.045967733853676626
+narrow_passage,7,planning_narrow,cartesian,True,success,,1.6203222000040114,0.7508334000012837,78,11594,False,18,2,0,1,10.640204394244783,5.57615954962877,21,5,True,,21.861045695675436,0.05612919455832875
+narrow_passage,8,planning_narrow,cartesian,True,success,,1.7993775000068126,0.824331700001494,92,14528,False,19,2,0,1,12.037364031461568,6.460366910520804,25,6,True,,20.88263876624373,0.09934759727285712
+narrow_passage,9,planning_narrow,cartesian,True,success,,1.3172472000005655,0.24674839999352116,30,8440,False,18,4,0,1,6.488557168258493,4.367913713516028,12,6,True,,21.480644876034308,0.013207968665253469
+narrow_passage,10,planning_narrow,cartesian,True,success,,1.6054783999861684,0.8797434000007343,105,12313,False,19,1,0,1,10.321560023096694,4.486814594733661,19,5,True,,20.011434316184197,0.04487708894726461
+narrow_passage,11,planning_narrow,cartesian,True,success,,1.2973391999985324,0.4893426000053296,55,9444,False,19,3,0,1,8.16698381314286,4.105336864195216,17,5,True,,21.59889133738714,0.016773647506856212
+narrow_passage,12,planning_narrow,cartesian,True,success,,1.5858611000003293,0.35436979999940377,45,11351,False,16,4,0,1,12.216482819751672,6.962614454499184,24,7,True,,20.29468715222721,0.03129728430033989
+narrow_passage,13,planning_narrow,cartesian,True,success,,1.2333725999924354,0.4908774000068661,56,8395,False,18,4,0,1,8.728461322126423,3.57521654593364,18,5,True,,19.84722628103468,0.07004710813890896
+narrow_passage,14,planning_narrow,cartesian,True,success,,1.512415699995472,0.44712060000165366,47,10693,False,17,4,0,1,11.63014200401602,8.188659459563969,23,10,True,,20.371470152749414,0.05849011775752001
+narrow_passage,15,planning_narrow,cartesian,True,success,,1.58590489999915,0.6553258000058122,77,10877,False,17,2,0,1,6.526644319720538,3.6539819062979193,11,6,True,,21.10501269846643,0.05165471934795946
+narrow_passage,16,planning_narrow,cartesian,True,success,,1.6145672999991802,0.7761164999974426,84,12326,False,19,3,0,1,7.3683079086509045,4.152942160132735,14,6,True,,20.134691562454176,0.015487681660933584
+narrow_passage,17,planning_narrow,cartesian,True,success,,1.952476899998146,0.4257165999879362,55,14898,False,14,2,0,1,10.361764212183722,5.899856011295536,23,6,True,,23.070946298799285,0.0931868353147706
+narrow_passage,18,planning_narrow,cartesian,True,success,,1.3694776000047568,0.3716437999974005,41,8367,False,15,2,0,1,5.64823991680136,3.422685032811609,12,8,True,,20.689283679631924,0.011730754790250666
+narrow_passage,19,planning_narrow,cartesian,True,success,,1.38669659999141,0.647547400003532,80,10827,False,19,3,0,1,9.59721322041519,5.8474117941420864,16,6,True,,20.584224741725055,0.046131574544478825
+narrow_random_ik_only,0,planning_narrow,cartesian,True,success,,4.525723500002641,0.5467269000073429,430,40834,False,11,3,2,3,11.087290653021938,6.435790172146112,21,7,True,,20.65055644290449,0.07577972166858268
+narrow_random_ik_only,1,planning_narrow,cartesian,True,success,,1.6130790000024717,0.478200099998503,52,11826,False,11,3,0,1,9.255577790141654,4.804933954795588,19,7,True,,20.00722981846062,0.07378968731073891
+narrow_random_ik_only,2,planning_narrow,cartesian,False,no_valid_ik,no collision-free IK configuration: all 11 solutions rejected (e.g. within clearance (2.6 mm < 20 mm): ceiling-link4),0.2470539999922039,nan,0,12,,11,0,,,nan,nan,,,,,,
+narrow_random_ik_only,3,planning_narrow,cartesian,False,timeout,no path to any of 2 IK postures (posture 1: planner timed out after 2.34923 s (253 nodes); posture 2: planner timed out after 2.34396 s (260 nodes)),5.001881100004539,2.3440855000080774,513,42048,False,10,2,,2,nan,nan,,,,,,
+narrow_random_ik_only,4,planning_narrow,cartesian,True,success,,1.7271773999964353,0.5755793999996968,69,12796,False,9,1,0,1,8.372304280651608,5.905104357356054,16,8,True,,20.79353155247783,0.04415182566523098
+narrow_random_ik_only,5,planning_narrow,cartesian,False,no_valid_ik,no collision-free IK configuration: all 9 solutions rejected (e.g. within clearance (2.6 mm < 20 mm): ceiling-link4),0.3456429000070784,nan,0,10,,9,0,,,nan,nan,,,,,,
+narrow_random_ik_only,6,planning_narrow,cartesian,True,success,,1.9320612000010442,0.48258769999665674,52,12683,False,8,2,0,1,15.818817269986559,8.718644099056938,31,8,True,,20.454326881503732,0.08194103727944177
+narrow_random_ik_only,7,planning_narrow,cartesian,False,no_valid_ik,no collision-free IK configuration: all 8 solutions rejected (e.g. within clearance (2.6 mm < 20 mm): ceiling-link4),0.4317172000010032,nan,0,9,,8,0,,,nan,nan,,,,,,
+narrow_random_ik_only,8,planning_narrow,cartesian,True,success,,1.8312749000033364,0.7987196999893058,80,13652,False,11,1,0,1,8.14193285426689,5.566593349056482,16,7,True,,20.007643129613907,0.019103091681537322
+narrow_random_ik_only,9,planning_narrow,cartesian,False,timeout,no path to any of 1 IK postures (posture 1: planner timed out after 4.75699 s (517 nodes)),5.0018971000099555,4.758623800007626,517,42389,False,10,1,,1,nan,nan,,,,,,
+narrow_random_ik_only,10,planning_narrow,cartesian,False,no_valid_ik,no collision-free IK configuration: all 8 solutions rejected (e.g. within clearance (2.6 mm < 20 mm): ceiling-link4),0.4006342999928165,nan,0,9,,8,0,,,nan,nan,,,,,,
+narrow_random_ik_only,11,planning_narrow,cartesian,True,success,,1.8816643000027398,1.0573499000020092,105,14383,False,12,4,0,1,11.422713017998595,5.780730143720322,24,5,True,,20.685862587890593,0.009839271315136884
+narrow_random_ik_only,12,planning_narrow,cartesian,True,success,,1.1060441000008723,0.2455372999975225,31,7724,False,9,1,0,1,6.9194186999094835,4.383655069668863,17,7,True,,20.064569479777624,0.09181389661448337
+narrow_random_ik_only,13,planning_narrow,cartesian,True,success,,2.190283600008115,1.1168199000094319,126,18267,False,10,1,0,1,9.896783489529833,6.141644158486065,20,5,True,,20.104931973885478,0.04802077251281007
+narrow_random_ik_only,14,planning_narrow,cartesian,True,success,,1.1019170000072336,0.3399881000077585,43,8277,False,10,1,0,1,9.090748533408732,5.4971112876182096,17,6,True,,22.37263781777027,0.004901454415856699
+narrow_random_ik_only,15,planning_narrow,cartesian,True,success,,3.3283341999922413,0.6576526999997441,274,30734,False,10,3,1,2,12.45758260185494,7.781538863609687,24,7,True,,24.152464390761143,0.09927714910238367
+narrow_random_ik_only,16,planning_narrow,cartesian,False,no_valid_ik,no collision-free IK configuration: all 10 solutions rejected (e.g. within clearance (2.6 mm < 20 mm): ceiling-link4),0.27678100000775885,nan,0,11,,10,0,,,nan,nan,,,,,,
+narrow_random_ik_only,17,planning_narrow,cartesian,True,success,,1.5085585000051651,0.44967430000542663,58,12444,False,10,4,0,1,7.59476513157651,4.362311862496947,13,5,True,,21.913679141454658,0.09685392238586546
+narrow_random_ik_only,18,planning_narrow,cartesian,False,no_valid_ik,no collision-free IK configuration: all 9 solutions rejected (e.g. within clearance (2.6 mm < 20 mm): ceiling-link4),0.3073943999916082,nan,0,10,,9,0,,,nan,nan,,,,,,
+narrow_random_ik_only,19,planning_narrow,cartesian,True,success,,2.0977549999952316,0.8571061999973608,81,13633,False,10,1,0,1,13.680375366797211,6.39640798498986,28,7,True,,20.32225682501519,0.07029299976462834
+multi_ik_near_obstacle,0,obstacles,cartesian,True,success,,0.9807218000059947,0.03627900000719819,8,9174,False,17,4,0,1,2.098515754951589,1.4263951349085353,6,3,True,,19.567998002707878,0.09592306793605973
+multi_ik_near_obstacle,1,obstacles,cartesian,True,success,,0.8115511999931186,0.05214400000113528,9,7045,False,18,4,0,1,2.343056637157506,1.4734897567580039,7,4,True,,19.198298848843486,0.05011035175079473
+multi_ik_near_obstacle,2,obstacles,cartesian,True,success,,0.7628840999968816,0.031192499998724088,8,4706,False,14,3,0,1,2.7509149642409585,1.884548645302301,7,4,True,,20.42392522758492,0.022992062905994114
+multi_ik_near_obstacle,3,obstacles,cartesian,True,success,,0.834886100012227,0.03894369999761693,8,7866,False,16,4,0,1,2.5345256471747835,1.7292722211475517,6,3,True,,20.08708050426834,0.07222717054200854
+multi_ik_near_obstacle,4,obstacles,cartesian,True,success,,0.6756614999903832,0.026656100002583116,7,4089,False,16,4,0,1,2.0495385421690004,1.635952941012185,6,3,True,,20.27615139123928,0.0864643339059124
+multi_ik_near_obstacle,5,obstacles,cartesian,True,success,,0.703753499998129,0.026625400001648813,7,5274,False,17,4,0,1,2.303858009267806,1.5753400400674562,6,5,True,,20.184697823446328,0.05787006566756372
+multi_ik_near_obstacle,6,obstacles,cartesian,True,success,,1.068220899993321,0.04507079999893904,11,9232,False,16,3,0,1,1.7125014268898568,1.611741614418998,6,4,True,,19.817768005931413,0.02905238704595798
+multi_ik_near_obstacle,7,obstacles,cartesian,True,success,,0.7685965999990003,0.02150479999545496,8,6451,False,17,4,0,1,2.157605073427106,1.3783698785510619,7,4,True,,19.140317499840084,0.03887905522496392
+multi_ik_near_obstacle,8,obstacles,cartesian,True,success,,0.6866929000098025,0.04495450000104029,10,4569,False,16,4,0,1,3.029473901995722,2.1353215160389225,7,3,True,,22.375696800606512,0.0901155311760636
+multi_ik_near_obstacle,9,obstacles,cartesian,True,success,,0.6405367000115803,0.025538000001688488,8,4438,False,16,4,0,1,2.4947911007237895,1.7984314957756902,7,4,True,,19.71417552611871,0.06467038378861065
+multi_ik_near_obstacle,10,obstacles,cartesian,True,success,,0.7144229999976233,0.02387660001113545,7,5586,False,17,4,0,1,1.9226835182840887,1.4542371634760838,6,3,True,,19.296896397406396,0.03389675210921434
+multi_ik_near_obstacle,11,obstacles,cartesian,True,success,,0.6613076999929035,0.0430208999896422,10,4459,False,17,4,0,1,1.9574194578769277,1.5581676338462593,7,3,True,,19.770656121874765,0.03557710369224446
+multi_ik_near_obstacle,12,obstacles,cartesian,True,success,,0.9496092999906978,0.03989749999891501,10,6751,False,14,4,0,1,2.039892632109467,1.4679087500781234,7,4,True,,19.659051339757045,0.0781490599738947
+multi_ik_near_obstacle,13,obstacles,cartesian,True,success,,0.6877982000005431,0.03674939999473281,8,6399,False,19,4,0,1,2.2809449998866507,1.4518573329541051,7,3,True,,19.76150931706194,0.03686568909662193
+multi_ik_near_obstacle,14,obstacles,cartesian,True,success,,0.7726994999975432,0.031169199995929375,8,7199,False,18,4,0,1,2.705695639178593,1.7633957662066058,7,5,True,,19.816038601362948,0.03346142359041078
+multi_ik_near_obstacle,15,obstacles,cartesian,True,success,,0.5575936999957776,0.030675300004077144,8,4138,False,17,2,0,1,2.6589626434959426,1.5190918448973976,7,3,True,,19.933559239614038,0.03731260053688566
+multi_ik_near_obstacle,16,obstacles,cartesian,True,success,,0.7030572000076063,0.027305700001306832,8,5599,False,17,4,0,1,1.717590898267746,1.55450218346011,6,4,True,,19.754308450144098,0.09046058331636547
+multi_ik_near_obstacle,17,obstacles,cartesian,True,success,,0.8593716999894241,0.020310799998696893,7,6718,False,15,4,0,1,1.8092871949864764,1.381993630445136,6,4,True,,18.723480259326394,0.09216733835711627
+multi_ik_near_obstacle,18,obstacles,cartesian,True,success,,0.7332258999958867,0.031388700008392334,8,3516,False,14,4,0,1,1.747935165097568,1.3891171204106016,6,3,True,,20.339228671959273,0.019903149307886087
+multi_ik_near_obstacle,19,obstacles,cartesian,True,success,,1.1643218000099296,0.03196870000101626,8,12226,False,17,4,0,1,2.415603428862581,1.5873427158530715,7,4,True,,18.904829398830778,0.009577941905639422
+unreachable,0,table,cartesian,False,unreachable,Cartesian target unreachable: IK did not converge from 22 seeds (closest 359.6 mm),1.1844544999912614,nan,0,1,,0,0,,,nan,nan,,,,,,
+unreachable,1,table,cartesian,False,unreachable,Cartesian target unreachable: IK did not converge from 22 seeds (closest 359.7 mm),1.0972163999977056,nan,0,1,,0,0,,,nan,nan,,,,,,
+unreachable,2,table,cartesian,False,unreachable,Cartesian target unreachable: IK did not converge from 22 seeds (closest 359.6 mm),0.9742038000113098,nan,0,1,,0,0,,,nan,nan,,,,,,
+unreachable,3,table,cartesian,False,unreachable,Cartesian target unreachable: IK did not converge from 22 seeds (closest 359.9 mm),0.9850549999973737,nan,0,1,,0,0,,,nan,nan,,,,,,
+unreachable,4,table,cartesian,False,unreachable,Cartesian target unreachable: IK did not converge from 22 seeds (closest 359.6 mm),0.8898874999867985,nan,0,1,,0,0,,,nan,nan,,,,,,
+unreachable,5,table,cartesian,False,unreachable,Cartesian target unreachable: IK did not converge from 22 seeds (closest 359.6 mm),0.906989800001611,nan,0,1,,0,0,,,nan,nan,,,,,,
+unreachable,6,table,cartesian,False,unreachable,Cartesian target unreachable: IK did not converge from 22 seeds (closest 359.8 mm),1.108963799997582,nan,0,1,,0,0,,,nan,nan,,,,,,
+unreachable,7,table,cartesian,False,unreachable,Cartesian target unreachable: IK did not converge from 22 seeds (closest 359.9 mm),1.2408496999996714,nan,0,1,,0,0,,,nan,nan,,,,,,
+unreachable,8,table,cartesian,False,unreachable,Cartesian target unreachable: IK did not converge from 22 seeds (closest 359.5 mm),1.1676931999973021,nan,0,1,,0,0,,,nan,nan,,,,,,
+unreachable,9,table,cartesian,False,unreachable,Cartesian target unreachable: IK did not converge from 22 seeds (closest 359.5 mm),1.010766399995191,nan,0,1,,0,0,,,nan,nan,,,,,,
+unreachable,10,table,cartesian,False,unreachable,Cartesian target unreachable: IK did not converge from 22 seeds (closest 359.5 mm),1.0302727999951458,nan,0,1,,0,0,,,nan,nan,,,,,,
+unreachable,11,table,cartesian,False,unreachable,Cartesian target unreachable: IK did not converge from 22 seeds (closest 359.5 mm),1.0982477999932598,nan,0,1,,0,0,,,nan,nan,,,,,,
+unreachable,12,table,cartesian,False,unreachable,Cartesian target unreachable: IK did not converge from 22 seeds (closest 359.5 mm),0.8817262000084156,nan,0,1,,0,0,,,nan,nan,,,,,,
+unreachable,13,table,cartesian,False,unreachable,Cartesian target unreachable: IK did not converge from 22 seeds (closest 359.6 mm),1.108350900001824,nan,0,1,,0,0,,,nan,nan,,,,,,
+unreachable,14,table,cartesian,False,unreachable,Cartesian target unreachable: IK did not converge from 22 seeds (closest 359.5 mm),0.8133161000005202,nan,0,1,,0,0,,,nan,nan,,,,,,
+unreachable,15,table,cartesian,False,unreachable,Cartesian target unreachable: IK did not converge from 22 seeds (closest 359.6 mm),0.9734750000061467,nan,0,1,,0,0,,,nan,nan,,,,,,
+unreachable,16,table,cartesian,False,unreachable,Cartesian target unreachable: IK did not converge from 22 seeds (closest 359.6 mm),1.162754799996037,nan,0,1,,0,0,,,nan,nan,,,,,,
+unreachable,17,table,cartesian,False,unreachable,Cartesian target unreachable: IK did not converge from 22 seeds (closest 359.5 mm),0.7508736000017961,nan,0,1,,0,0,,,nan,nan,,,,,,
+unreachable,18,table,cartesian,False,unreachable,Cartesian target unreachable: IK did not converge from 22 seeds (closest 359.7 mm),0.8983243999973638,nan,0,1,,0,0,,,nan,nan,,,,,,
+unreachable,19,table,cartesian,False,unreachable,Cartesian target unreachable: IK did not converge from 22 seeds (closest 359.5 mm),0.81280830000469,nan,0,1,,0,0,,,nan,nan,,,,,,
+start_in_collision,0,table,cartesian,False,invalid_start,start configuration invalid: collision: table-hand,0.0007741000008536503,nan,0,1,,,,,,nan,nan,,,,,,
+start_in_collision,1,table,cartesian,False,invalid_start,start configuration invalid: collision: table-hand,0.0004672999930335209,nan,0,1,,,,,,nan,nan,,,,,,
+start_in_collision,2,table,cartesian,False,invalid_start,start configuration invalid: collision: table-hand,0.0007138999935705215,nan,0,1,,,,,,nan,nan,,,,,,
+start_in_collision,3,table,cartesian,False,invalid_start,start configuration invalid: collision: table-hand,0.0005061999981990084,nan,0,1,,,,,,nan,nan,,,,,,
+start_in_collision,4,table,cartesian,False,invalid_start,start configuration invalid: collision: table-hand,0.0007593000045744702,nan,0,1,,,,,,nan,nan,,,,,,
+start_in_collision,5,table,cartesian,False,invalid_start,start configuration invalid: collision: table-hand,0.0004290000069886446,nan,0,1,,,,,,nan,nan,,,,,,
+start_in_collision,6,table,cartesian,False,invalid_start,start configuration invalid: collision: table-hand,0.000673700007610023,nan,0,1,,,,,,nan,nan,,,,,,
+start_in_collision,7,table,cartesian,False,invalid_start,start configuration invalid: collision: table-hand,0.000704799997038208,nan,0,1,,,,,,nan,nan,,,,,,
+start_in_collision,8,table,cartesian,False,invalid_start,start configuration invalid: collision: table-hand,0.00152679999882821,nan,0,1,,,,,,nan,nan,,,,,,
+start_in_collision,9,table,cartesian,False,invalid_start,start configuration invalid: collision: table-hand,0.0008104000007733703,nan,0,1,,,,,,nan,nan,,,,,,
+start_in_collision,10,table,cartesian,False,invalid_start,start configuration invalid: collision: table-hand,0.0007826999935787171,nan,0,1,,,,,,nan,nan,,,,,,
+start_in_collision,11,table,cartesian,False,invalid_start,start configuration invalid: collision: table-hand,0.0007976000051712617,nan,0,1,,,,,,nan,nan,,,,,,
+start_in_collision,12,table,cartesian,False,invalid_start,start configuration invalid: collision: table-hand,0.0008080999978119507,nan,0,1,,,,,,nan,nan,,,,,,
+start_in_collision,13,table,cartesian,False,invalid_start,start configuration invalid: collision: table-hand,0.0007692000071983784,nan,0,1,,,,,,nan,nan,,,,,,
+start_in_collision,14,table,cartesian,False,invalid_start,start configuration invalid: collision: table-hand,0.0007530000002589077,nan,0,1,,,,,,nan,nan,,,,,,
+start_in_collision,15,table,cartesian,False,invalid_start,start configuration invalid: collision: table-hand,0.0006694999901810661,nan,0,1,,,,,,nan,nan,,,,,,
+start_in_collision,16,table,cartesian,False,invalid_start,start configuration invalid: collision: table-hand,0.0005347999976947904,nan,0,1,,,,,,nan,nan,,,,,,
+start_in_collision,17,table,cartesian,False,invalid_start,start configuration invalid: collision: table-hand,0.0008314999868161976,nan,0,1,,,,,,nan,nan,,,,,,
+start_in_collision,18,table,cartesian,False,invalid_start,start configuration invalid: collision: table-hand,0.0009611000132281333,nan,0,1,,,,,,nan,nan,,,,,,
+start_in_collision,19,table,cartesian,False,invalid_start,start configuration invalid: collision: table-hand,0.0006185999955050647,nan,0,1,,,,,,nan,nan,,,,,,
+goal_in_collision,0,planning_demo,cartesian,False,no_valid_ik,no collision-free IK configuration: all 16 solutions rejected (e.g. collision: wall-link7),0.2420509000075981,nan,0,17,,16,0,,,nan,nan,,,,,,
+goal_in_collision,1,planning_demo,cartesian,False,no_valid_ik,no collision-free IK configuration: all 19 solutions rejected (e.g. collision: wall-link7),0.14032489999954123,nan,0,20,,19,0,,,nan,nan,,,,,,
+goal_in_collision,2,planning_demo,cartesian,False,no_valid_ik,no collision-free IK configuration: all 18 solutions rejected (e.g. collision: wall-link7),0.10454020000179298,nan,0,19,,18,0,,,nan,nan,,,,,,
+goal_in_collision,3,planning_demo,cartesian,False,no_valid_ik,no collision-free IK configuration: all 18 solutions rejected (e.g. collision: wall-link7),0.0821657999913441,nan,0,19,,18,0,,,nan,nan,,,,,,
+goal_in_collision,4,planning_demo,cartesian,False,no_valid_ik,no collision-free IK configuration: all 17 solutions rejected (e.g. collision: wall-link7),0.2186055999918608,nan,0,18,,17,0,,,nan,nan,,,,,,
+goal_in_collision,5,planning_demo,cartesian,False,no_valid_ik,no collision-free IK configuration: all 15 solutions rejected (e.g. collision: wall-link7),0.30748839999432676,nan,0,16,,15,0,,,nan,nan,,,,,,
+goal_in_collision,6,planning_demo,cartesian,False,no_valid_ik,no collision-free IK configuration: all 18 solutions rejected (e.g. collision: wall-link7),0.24230290000559762,nan,0,19,,18,0,,,nan,nan,,,,,,
+goal_in_collision,7,planning_demo,cartesian,False,no_valid_ik,no collision-free IK configuration: all 16 solutions rejected (e.g. collision: wall-link7),0.1364915000012843,nan,0,17,,16,0,,,nan,nan,,,,,,
+goal_in_collision,8,planning_demo,cartesian,False,no_valid_ik,no collision-free IK configuration: all 20 solutions rejected (e.g. collision: wall-link7),0.11666949999926146,nan,0,21,,20,0,,,nan,nan,,,,,,
+goal_in_collision,9,planning_demo,cartesian,False,no_valid_ik,no collision-free IK configuration: all 18 solutions rejected (e.g. collision: wall-link7),0.199179200004437,nan,0,19,,18,0,,,nan,nan,,,,,,
+goal_in_collision,10,planning_demo,cartesian,False,no_valid_ik,no collision-free IK configuration: all 16 solutions rejected (e.g. collision: wall-link7),0.22661270000389777,nan,0,17,,16,0,,,nan,nan,,,,,,
+goal_in_collision,11,planning_demo,cartesian,False,no_valid_ik,no collision-free IK configuration: all 16 solutions rejected (e.g. collision: wall-link7),0.26829219999490306,nan,0,17,,16,0,,,nan,nan,,,,,,
+goal_in_collision,12,planning_demo,cartesian,False,no_valid_ik,no collision-free IK configuration: all 16 solutions rejected (e.g. collision: wall-link7),0.29341030000068713,nan,0,17,,16,0,,,nan,nan,,,,,,
+goal_in_collision,13,planning_demo,cartesian,False,no_valid_ik,no collision-free IK configuration: all 19 solutions rejected (e.g. collision: wall-link7),0.19412949999968987,nan,0,20,,19,0,,,nan,nan,,,,,,
+goal_in_collision,14,planning_demo,cartesian,False,no_valid_ik,no collision-free IK configuration: all 15 solutions rejected (e.g. collision: wall-link7),0.32223760000488255,nan,0,16,,15,0,,,nan,nan,,,,,,
+goal_in_collision,15,planning_demo,cartesian,False,no_valid_ik,no collision-free IK configuration: all 16 solutions rejected (e.g. collision: wall-link7),0.21380969999881927,nan,0,17,,16,0,,,nan,nan,,,,,,
+goal_in_collision,16,planning_demo,cartesian,False,no_valid_ik,no collision-free IK configuration: all 17 solutions rejected (e.g. collision: wall-link7),0.21728490000532474,nan,0,18,,17,0,,,nan,nan,,,,,,
+goal_in_collision,17,planning_demo,cartesian,False,no_valid_ik,no collision-free IK configuration: all 14 solutions rejected (e.g. collision: wall-link7),0.43581590001122095,nan,0,15,,14,0,,,nan,nan,,,,,,
+goal_in_collision,18,planning_demo,cartesian,False,no_valid_ik,no collision-free IK configuration: all 15 solutions rejected (e.g. collision: wall-link7),0.3049689000035869,nan,0,16,,15,0,,,nan,nan,,,,,,
+goal_in_collision,19,planning_demo,cartesian,False,no_valid_ik,no collision-free IK configuration: all 18 solutions rejected (e.g. collision: wall-link7),0.22815090000221971,nan,0,19,,18,0,,,nan,nan,,,,,,
+timeout,0,planning_demo,joint,False,timeout,planner timed out after 0.005 s (3 nodes),0.008446799998637289,0.008237100002588704,3,80,False,,,,,nan,nan,,,,,,
+timeout,1,planning_demo,joint,False,timeout,planner timed out after 0.005 s (3 nodes),0.007519699996919371,0.007291000001714565,3,71,False,,,,,nan,nan,,,,,,
+timeout,2,planning_demo,joint,False,timeout,planner timed out after 0.005 s (3 nodes),0.006709599998430349,0.006525500008137897,3,78,False,,,,,nan,nan,,,,,,
+timeout,3,planning_demo,joint,False,timeout,planner timed out after 0.005 s (3 nodes),0.0063522999989800155,0.006141600009868853,3,71,False,,,,,nan,nan,,,,,,
+timeout,4,planning_demo,joint,False,timeout,planner timed out after 0.005 s (3 nodes),0.006538199988426641,0.0063522999989800155,3,72,False,,,,,nan,nan,,,,,,
+timeout,5,planning_demo,joint,False,timeout,planner timed out after 0.005 s (3 nodes),0.011388800005079247,0.01105049999023322,3,77,False,,,,,nan,nan,,,,,,
+timeout,6,planning_demo,joint,False,timeout,planner timed out after 0.005 s (3 nodes),0.0062833999982103705,0.006109699999797158,3,75,False,,,,,nan,nan,,,,,,
+timeout,7,planning_demo,joint,False,timeout,planner timed out after 0.005 s (3 nodes),0.01280189999670256,0.01240989999496378,3,72,False,,,,,nan,nan,,,,,,
+timeout,8,planning_demo,joint,False,timeout,planner timed out after 0.005 s (3 nodes),0.006240099988644943,0.006047899994882755,3,66,False,,,,,nan,nan,,,,,,
+timeout,9,planning_demo,joint,False,timeout,planner timed out after 0.005 s (3 nodes),0.008067300004768185,0.007875199997215532,3,80,False,,,,,nan,nan,,,,,,
+timeout,10,planning_demo,joint,False,timeout,planner timed out after 0.005 s (3 nodes),0.007027999992715195,0.006804899996495806,3,74,False,,,,,nan,nan,,,,,,
+timeout,11,planning_demo,joint,False,timeout,planner timed out after 0.005 s (3 nodes),0.006624800007557496,0.006434300012188032,3,74,False,,,,,nan,nan,,,,,,
+timeout,12,planning_demo,joint,False,timeout,planner timed out after 0.005 s (3 nodes),0.008441700003459118,0.008265299999038689,3,89,False,,,,,nan,nan,,,,,,
+timeout,13,planning_demo,joint,False,timeout,planner timed out after 0.005 s (3 nodes),0.006783100005122833,0.006588499993085861,3,73,False,,,,,nan,nan,,,,,,
+timeout,14,planning_demo,joint,False,timeout,planner timed out after 0.005 s (3 nodes),0.006508499995106831,0.006338599996524863,3,79,False,,,,,nan,nan,,,,,,
+timeout,15,planning_demo,joint,False,timeout,planner timed out after 0.005 s (3 nodes),0.007480300002498552,0.007300400000531226,3,79,False,,,,,nan,nan,,,,,,
+timeout,16,planning_demo,joint,False,timeout,planner timed out after 0.005 s (3 nodes),0.005546000000322238,0.0053740000003017485,3,82,False,,,,,nan,nan,,,,,,
+timeout,17,planning_demo,joint,False,timeout,planner timed out after 0.005 s (4 nodes),0.008121099992422387,0.007948200000100769,4,136,False,,,,,nan,nan,,,,,,
+timeout,18,planning_demo,joint,False,timeout,planner timed out after 0.005 s (4 nodes),0.006688399997074157,0.006558500012033619,4,153,False,,,,,nan,nan,,,,,,
+timeout,19,planning_demo,joint,False,timeout,planner timed out after 0.005 s (4 nodes),0.008408299996517599,0.008277699991595,4,151,False,,,,,nan,nan,,,,,,
+node_budget,0,planning_demo,joint,False,node_budget,node budget of 8 exceeded,0.03373039999860339,0.03344860000652261,8,432,False,,,,,nan,nan,,,,,,
+node_budget,1,planning_demo,joint,False,node_budget,node budget of 8 exceeded,0.03622029999678489,0.03608480001275893,8,427,False,,,,,nan,nan,,,,,,
+node_budget,2,planning_demo,joint,False,node_budget,node budget of 8 exceeded,0.024190800002543256,0.024082599993562326,8,451,False,,,,,nan,nan,,,,,,
+node_budget,3,planning_demo,joint,True,success,,0.1817566999961855,0.021064999993541278,8,2560,False,,,,,1.9019712813633185,1.3098065304785713,6,4,True,,20.359067384221497,
+node_budget,4,planning_demo,joint,False,node_budget,node budget of 8 exceeded,0.031192499998724088,0.031051899990416132,8,410,False,,,,,nan,nan,,,,,,
+node_budget,5,planning_demo,joint,False,node_budget,node budget of 8 exceeded,0.02346650000254158,0.023345700014033355,8,436,False,,,,,nan,nan,,,,,,
+node_budget,6,planning_demo,joint,False,node_budget,node budget of 8 exceeded,0.043525100001716055,0.0433952000021236,8,457,False,,,,,nan,nan,,,,,,
+node_budget,7,planning_demo,joint,False,node_budget,node budget of 8 exceeded,0.03527419999591075,0.035151100004441105,8,454,False,,,,,nan,nan,,,,,,
+node_budget,8,planning_demo,joint,False,node_budget,node budget of 8 exceeded,0.036708800005726516,0.03656560000672471,8,458,False,,,,,nan,nan,,,,,,
+node_budget,9,planning_demo,joint,False,node_budget,node budget of 8 exceeded,0.03227199999673758,0.032136599998921156,8,433,False,,,,,nan,nan,,,,,,
+node_budget,10,planning_demo,joint,False,node_budget,node budget of 8 exceeded,0.03601519999210723,0.0358832999918377,8,460,False,,,,,nan,nan,,,,,,
+node_budget,11,planning_demo,joint,False,node_budget,node budget of 8 exceeded,0.03698330000042915,0.03685080001014285,8,455,False,,,,,nan,nan,,,,,,
+node_budget,12,planning_demo,joint,False,node_budget,node budget of 8 exceeded,0.0364908000046853,0.03635219999705441,8,458,False,,,,,nan,nan,,,,,,
+node_budget,13,planning_demo,joint,False,node_budget,node budget of 8 exceeded,0.02634300000499934,0.02621260000159964,8,423,False,,,,,nan,nan,,,,,,
+node_budget,14,planning_demo,joint,False,node_budget,node budget of 8 exceeded,0.03879140000208281,0.03862469999876339,8,455,False,,,,,nan,nan,,,,,,
+node_budget,15,planning_demo,joint,False,node_budget,node budget of 8 exceeded,0.044299200002569705,0.044137100005173124,8,462,False,,,,,nan,nan,,,,,,
+node_budget,16,planning_demo,joint,False,node_budget,node budget of 8 exceeded,0.03398409999499563,0.03383640000538435,8,448,False,,,,,nan,nan,,,,,,
+node_budget,17,planning_demo,joint,False,node_budget,node budget of 8 exceeded,0.033661499997833744,0.03350309999950696,8,432,False,,,,,nan,nan,,,,,,
+node_budget,18,planning_demo,joint,False,node_budget,node budget of 8 exceeded,0.02490869999746792,0.024793699994916096,8,466,False,,,,,nan,nan,,,,,,
+node_budget,19,planning_demo,joint,False,node_budget,node budget of 8 exceeded,0.03295720000460278,0.03282300000137184,8,429,False,,,,,nan,nan,,,,,,

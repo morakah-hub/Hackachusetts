@@ -1,0 +1,114 @@
+<div class="part">Part V — Architecture and Experiments<small>How the software is organized, how it grew, what every experiment measured, and how the tests guard it.</small></div>
+
+<h1 class="chapter" id="ch-arch">Software architecture and modularity</h1>
+
+<p class="chapter-intro">Which parts of the code could be swapped out cleanly, which are merely in separate files, and which are tightly bound to the Panda and to MuJoCo. The second half asks what it would take to substitute major components; everything there is a proposal.</p>
+
+<h2 id="s-layers2">The intended layering</h2>
+<p>The project's stated rules (<span class="file">CLAUDE.md</span>, "Conventions and rules") are: environments know nothing about
+robots; tasks produce references only; controllers produce actuator commands only; settings belong in YAML; the
+prediction model never writes live simulation data; motion comes only from <code>data.ctrl</code> + <code>mj_step</code>. The import
+graph (Chapter 2) shows these rules are largely respected.</p>
+<figure id="fig-deps">
+<svg class="diagram" width="620" height="300" viewBox="0 0 620 300" xmlns="http://www.w3.org/2000/svg">
+<defs><marker id="a13" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><path d="M0,0 L7,3.5 L0,7 z" fill="#56636f"/></marker>
+<marker id="a13r" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><path d="M0,0 L7,3.5 L0,7 z" fill="#c0392b"/></marker></defs>
+<g font-size="10">
+<rect x="230" y="10" width="160" height="34" rx="4" fill="#fdf4e6" stroke="#b87414"/><text x="310" y="31" text-anchor="middle">main.py, benchmark drivers</text>
+<rect x="230" y="70" width="160" height="34" rx="4" fill="#dfeaf3" stroke="#1f5f8b" stroke-width="2"/><text x="310" y="91" text-anchor="middle" font-weight="600">simulation/runner.py</text>
+<rect x="20" y="140" width="120" height="34" rx="4" fill="#eaf1fa" stroke="#3a6ea8"/><text x="80" y="161" text-anchor="middle">controllers/</text>
+<rect x="160" y="140" width="100" height="34" rx="4" fill="#e8f3ec" stroke="#3f8f5a"/><text x="210" y="161" text-anchor="middle">tasks/</text>
+<rect x="280" y="140" width="110" height="34" rx="4" fill="#f6f0fb" stroke="#7a4fa3"/><text x="335" y="161" text-anchor="middle">planning/</text>
+<rect x="410" y="140" width="190" height="34" rx="4" fill="#f3f5f7" stroke="#56636f"/><text x="505" y="161" text-anchor="middle">simulation/kinematics.py</text>
+<rect x="410" y="210" width="190" height="34" rx="4" fill="#f3f5f7" stroke="#56636f"/><text x="505" y="231" text-anchor="middle">simulation/engine.py</text>
+<rect x="430" y="262" width="150" height="30" rx="4" fill="#f3f5f7" stroke="#56636f"/><text x="505" y="281" text-anchor="middle">robots/panda.py</text>
+<rect x="20" y="230" width="360" height="40" rx="4" fill="#fff" stroke="#999" stroke-dasharray="4 3"/><text x="200" y="248" text-anchor="middle" font-size="9.5">MuJoCo (MjModel, MjData, mj_step, mj_inverse, mjd_transitionFD,</text><text x="200" y="262" text-anchor="middle" font-size="9.5">mj_collision, mj_geomDistance) — used directly by every layer</text>
+<line x1="310" y1="44" x2="310" y2="68" stroke="#56636f" marker-end="url(#a13)"/>
+<line x1="270" y1="104" x2="90" y2="138" stroke="#56636f" marker-end="url(#a13)"/>
+<line x1="290" y1="104" x2="215" y2="138" stroke="#56636f" marker-end="url(#a13)"/>
+<line x1="315" y1="104" x2="330" y2="138" stroke="#56636f" marker-end="url(#a13)"/>
+<line x1="350" y1="104" x2="490" y2="138" stroke="#56636f" marker-end="url(#a13)"/>
+<line x1="370" y1="100" x2="470" y2="208" stroke="#56636f" marker-end="url(#a13)"/>
+<line x1="390" y1="157" x2="408" y2="157" stroke="#c0392b" marker-end="url(#a13r)"/><text x="384" y="135" font-size="8.5" fill="#c0392b">ik.py → kinematics</text>
+<line x1="505" y1="174" x2="505" y2="208" stroke="#56636f" marker-end="url(#a13)"/>
+<line x1="505" y1="244" x2="505" y2="260" stroke="#56636f" marker-end="url(#a13)"/>
+<path d="M 60 140 C 60 120 40 120 40 135" fill="none" stroke="#c0392b" marker-end="url(#a13r)"/><text x="10" y="122" font-size="8.5" fill="#c0392b">torque_mpc → mpc helpers</text>
+<line x1="80" y1="174" x2="120" y2="228" stroke="#999" stroke-dasharray="3 3"/><line x1="335" y1="174" x2="300" y2="228" stroke="#999" stroke-dasharray="3 3"/>
+<text x="168" y="196" font-size="8.5" fill="#3f8f5a">tasks import nothing else;</text><text x="168" y="208" font-size="8.5" fill="#3f8f5a">planner injected as a function</text>
+</g></svg>
+<figcaption>Module dependencies (arrows: "imports"). Red: couplings that cut across the intended layers. Dashed: direct
+MuJoCo use. The runner is the only module that knows about all others.</figcaption></figure>
+
+<h2 id="s-truly">What is truly modular</h2>
+<ul>
+<li><strong>Controllers behind one interface.</strong> All four implement <code>Controller.compute(q, qd, q_ref, qd_ref, dt, t, qdd_ref)</code>
+and <code>reset()</code>; the runner and benchmarks treat them uniformly; a new controller needs one class and one branch in
+<code>build_controller</code>. Controllers never import tasks, planners or the engine; future references arrive through the injected
+<code>reference_preview</code> callable.</li>
+<li><strong>Tasks as reference generators.</strong> Every task exposes <code>reference(t)</code>, <code>duration</code>, <code>waypoints</code> and timing
+information (an implicit, duck-typed interface; there is no abstract base class). The planner is injected as a function
+(<code>plan=planner.plan_to_position</code>), so tasks do not depend on <code>planning/</code>.</li>
+<li><strong>Environments independent of robots.</strong> Scene files only need a <code>robot_mount</code> site and a <code>target</code> mocap body; the
+robot is attached in code.</li>
+<li><strong>Configuration-driven runs.</strong> Environment, task, controller, planner settings, mismatch, noise and geometry overrides
+all come from YAML, so experiments are data, not code.</li>
+<li><strong>Planner invisible to controllers.</strong> Planning produces an ordinary joint reference; the same plan runs under any controller.</li>
+</ul>
+
+<h2 id="s-files">What is only separated into files</h2>
+<ul>
+<li><strong>The robot.</strong> <code>Panda</code> is a dataclass of names and limits, and <code>SimulationEngine</code> reads its fields (joint names,
+actuator names, base body, end-effector site). But Panda specifics leak elsewhere: the end-effector offset, the gripper command 255,
+the actuator conversion in <code>_make_torque_actuators</code> (assumes seven <code>general</code> actuators with a <code>home</code> keyframe), the
+finger handling in the prediction model (it composes only the arm block), and the 7-joint shapes assumed in tests and configs.</li>
+<li><strong>Controller selection.</strong> <code>CONTROLLER_TYPES</code>, <code>CONTROLLER_ACTUATION</code> and the <code>build_*</code> functions in
+<span class="file">runner.py</span> are a hand-written factory; adding a controller means editing the runner.</li>
+<li><strong>Experiment drivers.</strong> The three benchmark modules share patterns (config building, CSV writing) but not code; they import
+specific controller classes to read their statistics.</li>
+</ul>
+
+<h2 id="s-coupled">What is tightly coupled</h2>
+<ul>
+<li><strong>MuJoCo everywhere.</strong> The prediction model (<code>mjd_transitionFD</code>, rollouts), inverse dynamics (<code>mj_inverse</code>), the
+observer (<code>mjENBL_INVDISCRETE</code>), kinematics (<code>mj_kinematics</code>, <code>mj_jacSite</code>), the collision checker
+(<code>mj_collision</code>, <code>mj_geomDistance</code>, margins, midphase flag) and the benchmarks all take <code>MjModel</code>/<code>MjData</code>
+directly. This is a deliberate strength (the controller model is exactly the simulator's dynamics) and the main obstacle to
+changing simulator.</li>
+<li><strong>Torque MPC on servo-MPC internals.</strong> <code>torque_mpc.py</code> imports <code>MPCStats</code>, <code>MPCUpdate</code>,
+<code>plan_violations</code> and the private helper <code>_per_joint</code> from <code>mpc.py</code>.</li>
+<li><strong>Planning on simulation code.</strong> <code>planning/ik.py</code> and <code>motion_planner.py</code> use <code>simulation.kinematics.ArmKinematics</code>,
+and the checker is built from a <code>SimulationEngine</code> (<code>from_engine</code>).</li>
+<li><strong>Benchmark cycle.</strong> <code>simulation/robustness.py</code> imports <code>planning_benchmark</code>, which imports <code>robustness</code> lazily inside
+a function for <code>ExactClearance</code>.</li>
+<li><strong>Special names.</strong> The engine excludes contact between the robot base and a body literally named <code>table</code>.</li>
+</ul>
+
+<h2 id="s-subst">What substitutions would require</h2>
+<div class="box proposal"><span class="lbl">Proposals — none of this is implemented</span>
+<table class="small">
+<thead><tr><th>Substitute</th><th>What would have to change</th><th>Effort</th></tr></thead>
+<tbody>
+<tr><td>A different 7-DOF (or n-DOF) arm with a MuJoCo model</td><td>A new robot description (joint/actuator/site names, limits, home pose, torque-actuator conversion); configs with new waypoints and start poses; re-check scenario validity tests; n-DOF already mostly parametric (<code>dof</code> from the robot). The collision checker, planner and controllers would work unchanged if the model is a MuJoCo MJCF.</td><td>small–medium</td></tr>
+<tr><td>A humanoid robot</td><td>Floating base (qpos ≠ qvel dimensions for the base, quaternions), balance and contact as part of the task, many more DOF (QP size grows ~ (2n)²), whole-body control instead of joint tracking, planning in a much larger space with contact constraints. The controller interface (joint references) would no longer be the right abstraction.</td><td>a new project</td></tr>
+<tr><td>Genesis (or another simulator) instead of MuJoCo</td><td>Every MuJoCo call above needs an equivalent: stepping, state get/set, inverse dynamics, discrete-step Jacobians (or a different linearization), contacts with margins, exact distance queries. The v0.5.1/v0.5.2 lesson applies: distance queries of the new engine would need their own audit before any clearance claim.</td><td>large</td></tr>
+<tr><td>Camera-based perception</td><td>A perception module that outputs obstacle geometry (boxes, meshes or a voxel/distance map) into the planner's world model; today geometry comes from the compiled MuJoCo model. With MuJoCo boxes as the output format, <code>environment_overrides</code> already allows changing geometry per episode (Chapter 18).</td><td>medium</td></tr>
+<tr><td>An AI planning policy (e.g. learned motion generator)</td><td>Implement a function with the planner's signature, <code>plan(target, q_from) → result with path</code>, and keep the collision checker as a safety filter on its output (re-check every path, as <code>path_valid</code> does for old plans).</td><td>medium</td></tr>
+<tr><td>A different MPC</td><td>Implement <code>Controller</code>; reuse <code>MuJoCoPredictionModel</code> for models; register it in <code>build_controller</code>; add it to <code>configs/benchmark.yaml</code> for direct comparison with existing baselines.</td><td>small</td></tr>
+</tbody></table></div>
+
+<h2 id="s-ifaces">Recommended interfaces for future work</h2>
+<div class="box proposal"><span class="lbl">Proposals</span>
+<ul>
+<li><strong><code>RobotDescription</code></strong> protocol: dof, joint/actuator names, limits (position, velocity, acceleration, jerk, torque),
+end-effector frame, home pose, <code>load_spec(actuation)</code>. Removes Panda constants from the engine and prediction model.</li>
+<li><strong><code>DynamicsBackend</code></strong>: <code>step</code>, <code>get_state/set_state</code>, <code>inverse_dynamics</code>, <code>linearize(x, u, substeps)</code>,
+<code>gravity</code>. Implemented once for MuJoCo; the controllers would depend on it instead of on MuJoCo directly.</li>
+<li><strong><code>CollisionWorld</code></strong>: <code>min_distance(q)</code>, <code>in_collision(q, clearance)</code>, <code>update_geometry(obstacles)</code>; the
+checker's edge logic (lever arms, sampling) stays above it. A perception module would write into it.</li>
+<li><strong><code>Planner</code></strong> protocol (exists informally): <code>plan_joint</code>, <code>plan_to_position</code> → <code>MotionPlan</code>; allows RRT*, learned
+planners or trajectory optimization side by side.</li>
+<li><strong><code>Task</code></strong> abstract base class formalizing <code>reference(t)</code>, <code>duration</code>, <code>timing_report</code>; plus an event interface
+(target reached, replanning requested) that the current open-loop task sequence lacks.</li>
+<li>Move shared MPC statistics into a neutral module (e.g. <code>controllers/mpc_common.py</code>) and <code>ExactClearance</code> into
+<code>planning/</code> to remove the two cross-layer couplings.</li>
+</ul></div>

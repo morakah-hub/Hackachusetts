@@ -1,0 +1,77 @@
+<div class="part">Appendices<small>Glossary, mathematical reference, source-code index, running the project, and common questions.</small></div>
+
+<h1 class="appendix" id="app-gloss">Glossary</h1>
+<p>Plain-language definitions of the terms used in this guide, alphabetically.</p>
+<div class="twocol">
+<dl class="gloss">
+<dt>Actuator</dt><dd>The model of a motor at a joint. Converts a command into a joint torque. Here either a position servo or a torque motor.</dd>
+<dt>ADMM</dt><dd>Alternating Direction Method of Multipliers: the iterative algorithm inside OSQP; alternates a linear solve with a projection onto the constraints.</dd>
+<dt>Armature</dt><dd>Extra inertia added to a joint to represent the motor rotor and gearbox (0.1 kg·m² per Panda joint in the model).</dd>
+<dt>Broadphase / midphase / narrowphase</dt><dd>Stages of collision detection: cheap bounding-box culling of pairs, culling inside multi-geom bodies, and the exact shape-pair computation.</dd>
+<dt>C-space (configuration space)</dt><dd>The space of all joint-angle vectors; for the Panda arm a 7-D box. Each point is one posture.</dd>
+<dt>C-obstacle</dt><dd>The set of configurations in which the robot touches an obstacle.</dd>
+<dt>Clearance</dt><dd>The minimum distance between the robot and the environment; the planner requires 20 mm at checked configurations.</dd>
+<dt>Closed loop / feedback</dt><dd>Control that uses measurements of what actually happened to compute the next command.</dd>
+<dt>Computed-torque control (CTC)</dt><dd>Control that computes the torque for a desired acceleration with the robot's inverse dynamics plus PD feedback.</dd>
+<dt>Configuration</dt><dd>The vector of joint angles $q$; it fixes the pose of every link.</dd>
+<dt>Constraint (hard / soft)</dt><dd>A limit the optimizer must respect exactly (hard) or may violate at a heavy penalty (soft, via slack variables).</dd>
+<dt>Contact margin</dt><dd>A distance below which MuJoCo already reports a contact; used by the checker to implement clearance.</dd>
+<dt>Convex (problem)</dt><dd>An optimization problem whose every local minimum is global; quadratic programs with positive semidefinite cost are convex.</dd>
+<dt>Coriolis / centrifugal torques</dt><dd>Velocity-dependent torques arising from motion in rotating frames; the $C(q,\dot q)\dot q$ term.</dd>
+<dt>Degree of freedom (DOF)</dt><dd>An independent way a system can move.</dd>
+<dt>Damped least squares (DLS)</dt><dd>An IK step $J^T(JJ^T+\lambda^2I)^{-1}e$ that stays bounded near singularities.</dd>
+<dt>Deadline overrun</dt><dd>An MPC update that took longer (wall clock) than its control period (20 ms).</dd>
+<dt>Discretization</dt><dd>Turning a continuous-time model into a map from one sampling instant to the next.</dd>
+<dt>Disturbance observer</dt><dd>An estimator of unknown torques from measured motion and applied torque; makes control offset-free.</dd>
+<dt>Double-S profile</dt><dd>A jerk-limited, time-optimal rest-to-rest timing law with seven constant-jerk phases.</dd>
+<dt>Edge</dt><dd>A straight joint-space segment between two configurations; checked by sampling.</dd>
+<dt>End effector (EE)</dt><dd>The robot's working point; here a site between the fingertips.</dd>
+<dt>Episode</dt><dd>One complete run of an experiment condition.</dd>
+<dt>Exact penalty</dt><dd>A linear slack penalty large enough that soft constraints behave like hard ones whenever possible.</dd>
+<dt>Feedforward</dt><dd>The part of a command computed from the reference in advance, not from the error.</dd>
+<dt>Forward kinematics (FK)</dt><dd>Computing the hand pose from joint angles.</dd>
+<dt>Gravity compensation</dt><dd>The torque that holds the arm still against gravity, $g(q)$.</dd>
+<dt>GJK / EPA</dt><dd>Algorithms for the distance (GJK) and penetration depth (EPA) between convex shapes.</dd>
+<dt>Homogeneous transformation</dt><dd>A 4×4 matrix combining rotation and translation of a frame.</dd>
+<dt>Horizon (prediction)</dt><dd>How many steps ahead the MPC predicts; $N$ = 25 steps = 0.5 s for the torque MPC.</dd>
+<dt>Implicitfast</dt><dd>MuJoCo's integrator that treats velocity-dependent forces implicitly, stable for stiff damping.</dd>
+<dt>Inertia (mass) matrix $M(q)$</dt><dd>The posture-dependent matrix relating joint accelerations to the torques that produce them.</dd>
+<dt>Inverse dynamics</dt><dd>Computing the torque needed for a given acceleration (<code>mj_inverse</code>).</dd>
+<dt>Inverse kinematics (IK)</dt><dd>Finding joint angles that place the hand at a desired position.</dd>
+<dt>Jacobian</dt><dd>The matrix mapping joint velocities to hand velocity, $\dot x = J\dot q$.</dd>
+<dt>Jerk</dt><dd>The time derivative of acceleration.</dd>
+<dt>Lever arm $R_j$</dt><dd>An upper bound on the distance from joint $j$'s axis to any robot geometry it moves; bounds how far points move.</dd>
+<dt>Linearization</dt><dd>Approximating a nonlinear map by a linear (affine) one near an operating point.</dd>
+<dt>Linear MPC</dt><dd>MPC with a linear prediction model, giving a convex QP.</dd>
+<dt>Mocap body</dt><dd>A MuJoCo body moved kinematically by code; here the visual target marker.</dd>
+<dt>Model mismatch</dt><dd>A difference between the controller's model and the plant (tested by scaling masses).</dd>
+<dt>MPC (model predictive control)</dt><dd>Control by repeatedly solving a finite-horizon optimization with a model and applying the first command.</dd>
+<dt>MuJoCo</dt><dd>The physics engine simulating the robot (version 3.16).</dd>
+<dt>Null space</dt><dd>Joint motions that do not move the hand; used to steer a redundant arm's posture.</dd>
+<dt>Offset-free control</dt><dd>Control without steady-state error under constant disturbances.</dd>
+<dt>OSQP</dt><dd>The quadratic-programming solver used by both MPCs.</dd>
+<dt>Path / trajectory</dt><dd>A geometric route (no time) / a route with timing $q(t)$.</dd>
+<dt>PID</dt><dd>Proportional–integral–derivative feedback control.</dd>
+<dt>Plant</dt><dd>The system being controlled: the simulated Panda.</dd>
+<dt>Polishing</dt><dd>An OSQP step that refines an approximate solution to high accuracy.</dd>
+<dt>Position servo</dt><dd>An actuator that pulls a joint towards a commanded angle with a stiff spring-damper.</dd>
+<dt>Probabilistic completeness</dt><dd>The property that the chance of finding an existing path tends to 1 as sampling continues.</dd>
+<dt>Quadratic program (QP)</dt><dd>Minimize a quadratic cost subject to linear constraints.</dd>
+<dt>Quintic (minimum-jerk) profile</dt><dd>The timing law $10\tau^3 - 15\tau^4 + 6\tau^5$.</dd>
+<dt>Receding horizon</dt><dd>Re-planning at every step over a window that moves forward with time.</dd>
+<dt>Redundancy</dt><dd>Having more DOF than the task needs (7 joints for a 3-D position goal).</dd>
+<dt>Reference</dt><dd>The desired trajectory the controller tracks.</dd>
+<dt>RRT / RRT-Connect</dt><dd>Rapidly-exploring random tree planners; RRT-Connect grows two trees and joins them.</dd>
+<dt>Seed</dt><dd>A number fixing a random generator so runs are reproducible.</dd>
+<dt>Shortcutting</dt><dd>Shortening a planned path by replacing parts with valid straight edges.</dd>
+<dt>Singularity</dt><dd>A posture where the Jacobian loses rank and some hand directions are unreachable instantaneously.</dd>
+<dt>Slack variable</dt><dd>An extra variable that measures (and lets the optimizer pay for) a constraint violation.</dd>
+<dt>State</dt><dd>The variables that determine future motion: $x = (q, \dot q)$.</dd>
+<dt>Torque motor</dt><dd>An actuator that applies exactly the commanded torque (within limits).</dd>
+<dt>Tracking error</dt><dd>Reference minus actual; the main controller quality metric.</dd>
+<dt>Via point</dt><dd>An intermediate waypoint of a planned path; the reference stops there without holding.</dd>
+<dt>Warm start</dt><dd>Starting an iterative solver from a previous solution to save iterations.</dd>
+<dt>Workspace</dt><dd>The set of hand positions the robot can reach.</dd>
+<dt>World model</dt><dd>The robot's belief about its surroundings (implicit here: the MuJoCo model).</dd>
+<dt>Zero-order hold</dt><dd>Holding a command constant between sampling instants.</dd>
+</dl></div>

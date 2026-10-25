@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Robotics Lab Workbench</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<header>
+  <div class="brand"><span class="logo">◆</span> Robotics Lab <b>Workbench</b> <span class="ver">v0.7 · local simulation</span></div>
+  <div class="controls">
+    <button id="btn-run" class="primary" title="Build (if needed) and run the pending settings">▶ Run</button>
+    <button id="btn-pause" title="Pause / resume the live run">❚❚ Pause</button>
+    <button id="btn-step" title="One physics step (2 ms)">Step 2 ms</button>
+    <button id="btn-step-ctrl" title="One controller interval (MPC: 20 ms; CTC/PID: 2 ms)">Step interval</button>
+    <button id="btn-stop" class="danger" title="Stop the live run (it is saved as 'stopped')">■ Stop</button>
+    <button id="btn-reset" title="Rebuild the scene from the pending settings">↺ Reset</button>
+    <label class="inline">Speed
+      <select id="sel-speed"><option value="0.25">0.25×</option><option value="0.5">0.5×</option><option value="1" selected>1× real time</option><option value="2">2×</option><option value="0">max</option></select></label>
+    <label class="inline">Quality
+      <select id="sel-quality"><option value="low">low</option><option value="medium" selected>medium</option><option value="high">high</option></select></label>
+  </div>
+  <div id="status" class="status"><span id="st-state" class="pill">idle</span><span id="st-text"></span></div>
+  <button id="btn-quit" title="Stop the simulation and close the local server">Quit</button>
+</header>
+
+<main>
+  <aside id="config">
+    <h2>Task &amp; scene</h2>
+    <label>Scenario <select id="f-scenario"></select></label>
+    <p id="scenario-desc" class="hint"></p>
+    <label>Controller <select id="f-controller"></select></label>
+    <label class="check"><input type="checkbox" id="f-observer"> Disturbance observer (T = 10 ms)</label>
+    <div class="opt" data-opt="payload_kg">
+      <label>Payload <span class="unit">kg</span> <input type="number" id="f-payload" step="0.05" min="0.05" max="2"></label>
+      <div class="presets"><button data-mass="0.15">0.15 plastic</button><button data-mass="0.40">0.40 alu</button><button data-mass="1.15">1.15 steel</button></div>
+    </div>
+    <div class="opt" data-opt="object_xy">
+      <h3>Workspace (top view, world frame, m)</h3>
+      <canvas id="workspace" width="268" height="268" title="Drag the orange object and the green target"></canvas>
+      <div class="xy"><span class="swatch obj"></span>object x <input type="number" id="f-ox" step="0.01"> y <input type="number" id="f-oy" step="0.01"></div>
+      <div class="xy"><span class="swatch place"></span>place&nbsp; x <input type="number" id="f-px" step="0.01"> y <input type="number" id="f-py" step="0.01"></div>
+      <p class="hint">Grasp policy: prescribed top-down grasp, finger axis along world x (fixed).</p>
+      <div class="row"><button id="btn-scan" title="Classify object positions for the top-down grasp (private scratch model)">Scan workspace</button>
+        <span id="scan-legend" class="legend"></span></div>
+    </div>
+    <div class="opt" data-opt="targets">
+      <label>Reach targets <span class="unit">x y z (m), one per line</span><textarea id="f-targets" rows="3"></textarea></label>
+    </div>
+    <div class="opt" data-opt="obstacle">
+      <h3>Static obstacle <span class="unit">box centre / half extents, m</span></h3>
+      <div class="xy">pos <input type="number" id="f-obx" step="0.01"><input type="number" id="f-oby" step="0.01"><input type="number" id="f-obz" step="0.01"></div>
+      <div class="xy">size <input type="number" id="f-obsx" step="0.005"><input type="number" id="f-obsy" step="0.005"><input type="number" id="f-obsz" step="0.005"></div>
+    </div>
+    <details>
+      <summary>Physics presets, disturbances, noise</summary>
+      <div class="opt" data-opt="contact_preset"><label>Contact solver <select id="f-contact"></select></label></div>
+      <div class="opt" data-opt="grip_preset"><label>Gripper <select id="f-grip"></select></label></div>
+      <label>Planning seed <input type="number" id="f-seed" step="1" min="0"></label>
+      <div class="opt" data-opt="force_pulse">
+        <label class="check"><input type="checkbox" id="f-force-on"> Force pulse (world frame)</label>
+        <div class="xy">body <select id="f-force-body"></select> F <input type="number" id="f-force-mag" value="20" step="1"> N</div>
+        <div class="xy">dir <input type="number" id="f-fdx" value="0"><input type="number" id="f-fdy" value="0"><input type="number" id="f-fdz" value="-1"></div>
+        <div class="xy">at <input type="number" id="f-force-t" value="3" step="0.1"> s for <input type="number" id="f-force-d" value="0.5" step="0.1"> s</div>
+      </div>
+      <div class="opt" data-opt="noise">
+        <label class="check"><input type="checkbox" id="f-noise-on"> Arm measurement noise</label>
+        <div class="xy">σq <input type="number" id="f-noise-q" value="0.0005" step="0.0001"> rad σq̇ <input type="number" id="f-noise-v" value="0.005" step="0.001"> rad/s</div>
+        <div class="xy">seed <input type="number" id="f-noise-seed" value="0"></div>
+      </div>
+    </details>
+    <div class="row"><button id="btn-apply" class="primary">Apply settings</button><button id="btn-check" title="Pre-flight: validation, IK search for key poses, start collisions">Check</button><button id="btn-defaults">Defaults</button></div>
+    <div id="apply-msg" class="msg"></div>
+    <h3>Resolved pending settings</h3>
+    <ul id="resolved" class="resolved"></ul>
+  </aside>
+
+  <section id="viewport-wrap">
+    <div id="viewport">
+      <img id="frame" alt="MuJoCo render" draggable="false">
+      <div id="badge" class="badge live">LIVE</div>
+      <div class="cam-help">drag: orbit · shift+drag / right-drag: pan · wheel: zoom · <button id="btn-cam-reset">reset camera</button></div>
+      <div id="busy" class="busy hidden">computing (planning / building) …</div>
+    </div>
+  </section>
+
+  <aside id="inspector">
+    <nav id="tabs">
+      <button data-tab="result" class="active">Result</button><button data-tab="motion">Motion</button><button data-tab="mpc">MPC</button><button data-tab="dynamics">Dynamics</button><button data-tab="planning">Planning</button><button data-tab="explain">Explain</button><button data-tab="experiments">Experiments</button><button data-tab="sandbox">Sandbox</button><button data-tab="runs">Runs</button>
+    </nav>
+    <div id="tab-body"></div>
+  </aside>
+</main>
+
+<footer>
+  <div id="timeline">
+    <button id="btn-live">● Live</button>
+    <button id="btn-replay" title="Open the current/last run as recorded data">Replay</button>
+    <button id="btn-rplay">▶</button>
+    <select id="sel-rspeed"><option value="0.25">0.25×</option><option value="0.5">0.5×</option><option value="1" selected>1×</option><option value="2">2×</option><option value="4">4×</option></select>
+    <input type="range" id="scrub" min="0" max="1" step="0.002" value="0">
+    <span id="scrub-t" class="mono">t = –</span>
+    <label class="inline">Joint <select id="sel-joint"></select></label>
+  </div>
+  <div id="bottom">
+    <div id="plots">
+      <canvas id="plot1"></canvas><canvas id="plot2"></canvas><canvas id="plot3"></canvas>
+    </div>
+    <div id="console">
+      <div id="console-out" class="mono"></div>
+      <div class="console-in"><span class="prompt">›</span><input id="console-in" class="mono" placeholder="type a command, e.g. 'load pick; payload 1.15; run' — 'help' lists all" autocomplete="off"></div>
+    </div>
+  </div>
+</footer>
+<script src="/static/plot.js"></script>
+<script src="/static/app.js"></script>
+</body>
+</html>

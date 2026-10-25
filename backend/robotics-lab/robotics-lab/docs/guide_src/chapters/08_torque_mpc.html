@@ -1,0 +1,215 @@
+<h1 class="chapter" id="ch-mpc2">Our actual torque MPC implementation</h1>
+
+<p class="chapter-intro">A line-by-line account of <code>TorqueMPCController</code> (<span class="file">controllers/torque_mpc.py</span>) and its prediction model (<span class="file">controllers/prediction.py</span>). Every equation in this chapter corresponds to code; the source location is given under it.</p>
+
+<h2 id="s-mpc-over">Overview</h2>
+<p>The torque MPC is a <strong>linear, time-invariant-over-the-horizon, sparse-QP MPC with soft state constraints,
+hard torque limits, reference preview and an input-disturbance observer</strong>, re-linearized at every update
+from MuJoCo itself. At each update (every 10th physics step, i.e. 50 Hz) <code>_update</code> (line 295) performs:</p>
+<ol>
+<li>read the measured state $x_0 = (q, \dot q)$ and check it is finite;</li>
+<li>compute the gravity torque $\tau_g(q)$ and linearize MuJoCo around $(x_0, \tau_{\text{prev}})$: $A$, $B$, $c$;</li>
+<li>add the disturbance estimate to the model; form the references $r_1..r_N$ from the task preview;</li>
+<li>write the new numbers into the fixed-structure QP; warm-start OSQP; solve;</li>
+<li>keep the first torque as the held command; record statistics. On any failure, hand over to CTC.</li>
+</ol>
+
+<h2 id="s-mpc-vec">State, control and decision vectors</h2>
+<div class="box verified"><span class="lbl">Verified in source code</span>
+<ul>
+<li>State: $x = (q_1..q_7, \dot q_1..\dot q_7) \in \mathbb{R}^{14}$ (<code>self.nx = 2 * n</code>, line 107). Fingers are not part of it.</li>
+<li>Control: joint torques $\tau \in \mathbb{R}^7$ (Nm), held constant for $T_s$ = 20 ms (zero-order hold).</li>
+<li>Decision variable for torques: the <strong>normalized torque</strong> $v_k = \tau_k / \tau_{\text{scale}}$ with
+$\tau_{\text{scale}} = (87, 87, 87, 87, 12, 12, 12)$ Nm, the largest absolute force limit per joint (line 114).</li>
+<li>Full QP vector (comment at line 137):
+$z = [\,x_1, \dots, x_N \;|\; v_0, \dots, v_{N-1} \;|\; s_1, \dots, s_N\,]$, with one slack per state component per knot.
+For $N$ = 25: 350 + 175 + 350 = <strong>875 variables</strong>.</li>
+</ul></div>
+<p><strong>Why normalize?</strong> The position weight is $10^5$ per rad² while an effort weight of 1 per (Nm)² on a 87 Nm joint is
+$1/87^2 \approx 1.3\times10^{-4}$ per raw Nm². The diagonal of $P$ would span about ten orders of magnitude. The v0.3
+report measured the consequence: OSQP's polishing failed and the at-rest plan drifted 2.7 mrad. With normalized
+torques the drift is $10^{-9}$ rad (docstring lines 31–34; <span class="file">v0.3-results.md</span> §6).</p>
+
+<h2 id="s-mpc-model">The prediction model</h2>
+<h3>One physics step, differentiated by MuJoCo</h3>
+<p><code>MuJoCoPredictionModel.linearize(q, qd, u_lin)</code> (<span class="file">prediction.py</span>, line 245) uses the
+"power" method (<code>_jacobians_power</code>, line 270). It copies the live simulation state into private scratch data
+(positions, velocities, controls and the constraint solver's warm start; <em>not</em> the applied external forces,
+which a real controller cannot measure), overwrites the arm state and command, and calls
+<code>mujoco.mjd_transitionFD</code>, which returns the Jacobians of one complete 2 ms <code>mj_step</code> by forward finite
+differences with $\varepsilon = 10^{-6}$:</p>
+\[ A_1 = \frac{\partial x^{+}}{\partial x}\Big|_{x_0,\,u_{\text{lin}}}, \qquad B_1 = \frac{\partial x^{+}}{\partial u}\Big|_{x_0,\,u_{\text{lin}}} \quad (\text{arm block only, } 14\times14 \text{ and } 14\times7). \]
+<span class="eqsrc">prediction.py, _jacobians_power, lines 270–286</span>
+<p>These are derivatives of MuJoCo's actual discrete step (implicitfast integration, armature, damping, the full
+rigid-body dynamics), not of a textbook ODE. Only the arm block is kept: the fingers rest on a joint limit, and
+finite differences across that limit once produced a spectral radius of $10^{22}$ when the full matrix was composed.</p>
+<h3>Composition over the control interval</h3>
+<p>Assuming the one-step Jacobians stay constant over the $n$ = 10 physics steps of one control interval, with the
+torque held constant:</p>
+\[ A = A_1^{\,n}, \qquad B = \left(A_1^{\,n-1} + A_1^{\,n-2} + \dots + A_1 + I\right) B_1 . \]
+<span class="eqsrc">prediction.py, lines 281–285 (loop: B_n = A1 B_n + B1; A_n = A1 A_n)</span>
+<h3>The affine term makes the model exact at the linearization point</h3>
+<p>A true 10-step MuJoCo rollout $f_n$ from $(x_0, u_{\text{lin}})$ is run, and</p>
+\[ c = f_n(x_0, u_{\text{lin}}) - A x_0 - B u_{\text{lin}} . \]
+<span class="eqsrc">prediction.py, linearize, lines 264–266</span>
+<p>With this choice $x_1 = Ax_0 + Bu_{\text{lin}} + c$ equals the true MuJoCo state after one interval if the command is
+$u_{\text{lin}}$, so gravity, Coriolis and damping at the current state are included exactly, and only the
+<em>change</em> of command enters linearly. The linearization command is the last applied torque
+$\tau_{\text{prev}}$ (or $\tau_g$ before the first command; torque_mpc.py lines 305–307).</p>
+<h3>Safeguards</h3>
+<ul>
+<li><code>jacobians_plausible</code> (line 124) rejects non-finite matrices, entries above $10^3$, or a spectral radius of $A$ above 2.
+If the true-model Jacobians fail, Jacobians of a copy with force limits removed (<code>jac_model</code>) are used; if those
+fail too, the update raises and the fallback takes over. The backup exists for the servo case, where the one-step
+map is discontinuous at the force-clip boundary.</li>
+<li>The scratch data never writes the live <code>MjData</code> (<code>test_prediction_never_modifies_live_state</code>) and never
+sees <code>xfrc_applied</code> (<code>test_external_forces_are_not_visible_to_the_model</code>).</li>
+</ul>
+<h3>Offset-free model with the disturbance estimate</h3>
+<p>With the observer enabled (default), its current estimate $\hat d$ is treated as a constant known input over the
+whole horizon:</p>
+\[ x_{k+1} = A x_k + B\,(\tau_k + \hat d) + c \;=\; A x_k + B\tau_k + \underbrace{(c + B\hat d)}_{c'} . \]
+<span class="eqsrc">torque_mpc.py, _update, lines 311–313</span>
+<p>The same $(A, B, c')$ is used for every stage $k = 0..N-1$: the model is <strong>linear time-invariant over the
+horizon</strong>. This is linear MPC, not nonlinear MPC.</p>
+
+<h2 id="s-mpc-cost">The cost function, exactly as implemented</h2>
+<p>With $v_k = \tau_k/\tau_{\text{scale}}$ (element-wise), the torque that holds the arm still against gravity and the
+estimated disturbance $\tau_{\text{hold}} = \tau_g - \hat d$, its normalized version $v_{\text{hold}}$, and
+$v_{-1} = \tau_{\text{prev}}/\tau_{\text{scale}}$:</p>
+\[ \begin{aligned} J(z) = {} & \sum_{k=1}^{N} w_k\,(x_k - r_k)^T Q\,(x_k - r_k)
+ \;+\; w_e\sum_{k=0}^{N-1}\|v_k - v_{\text{hold}}\|^2 \\
+ & +\; w_r\sum_{k=0}^{N-1}\|v_k - v_{k-1}\|^2
+ \;+\; \sum_{k=1}^{N}\left(\rho_2\|s_k\|^2 + \rho_1\mathbf{1}^Ts_k\right) \end{aligned} \]
+<span class="eqsrc">torque_mpc.py, _build_structure lines 151–171 (quadratic part) and _update lines 325–331 (linear part)</span>
+<table id="tab-mpc-weights">
+<caption>Cost parameters (<code>TorqueMPCWeights</code>, overridden by <code>configs/default.yaml</code> → <code>torque_mpc.weights</code>).</caption>
+<thead><tr><th>Symbol</th><th>Code</th><th>Value</th><th>Meaning</th></tr></thead>
+<tbody>
+<tr><td>$Q$</td><td><code>position</code>, <code>velocity</code></td><td>diag(1e5 × 7, 10 × 7)</td><td>per rad², per (rad/s)²</td></tr>
+<tr><td>$w_k$</td><td><code>terminal</code></td><td>1 for k &lt; N, 5 for k = N</td><td>terminal stage multiplier</td></tr>
+<tr><td>$w_e$</td><td><code>effort</code></td><td>1</td><td>per (normalized torque above hold)²</td></tr>
+<tr><td>$w_r$</td><td><code>torque_rate</code></td><td>10</td><td>per (normalized torque change)²</td></tr>
+<tr><td>$\rho_2$, $\rho_1$</td><td><code>slack_quadratic</code>, <code>slack_linear</code></td><td>1e3, 1e6</td><td>soft-constraint penalties</td></tr>
+</tbody></table>
+<p><strong>How the code builds it.</strong> The code writes $J = z^THz + 2h^Tz$ (constants dropped) and gives OSQP
+$P = 2H$ (upper triangle) and $q = 2h$, so OSQP's $\tfrac12 z^TPz + q^Tz$ equals $J$ minus a constant. $H$ is diagonal
+except for the torque-rate band: the diagonal entry for $v_k$ is $w_e + 2w_r$ (or $w_e + w_r$ for $k = N-1$) and the
+off-diagonal entries between $v_{k-1}$ and $v_k$ are $-w_r$ (expanding $\|v_k - v_{k-1}\|^2$). The linear part is
+$h_{x_k} = -w_k Q r_k$, $h_{v_k} = -w_e v_{\text{hold}}$ with an extra $-w_r v_{-1}$ on $v_0$ (the rate term against the
+previously applied torque), and $h_{s} = \rho_1/2$. The quadratic matrix $H$ is constant, so <code>P</code> is set up once;
+only <code>q</code> changes at each update. <code>tools/audit_mpc_objective.py</code> verified the analogous construction of the
+servo MPC term by term to $6\times10^{-14}$ (v0.3 report §2).</p>
+<div class="box derived"><span class="lbl">Interpretation</span>
+<p>The effort term penalizes torque <em>beyond what is needed to hold the arm still</em>, not torque itself: holding against
+gravity is free. The rate term smooths the torque sequence and, through $v_{-1}$, penalizes jumps relative to the
+torque currently applied. With $Q_{\text{pos}} = 10^5$ and $w_e = 1$, a 1 mrad position error costs as much as a
+normalized torque deviation of 0.32, i.e. 27 Nm on a large joint: tracking dominates. This is also why the torque
+MPC is more sensitive to position noise than CTC (v0.4 report §5).</p></div>
+
+<h2 id="s-mpc-cons">The constraints, exactly as implemented</h2>
+\[ \begin{aligned}
+&\text{dynamics (equality):} && x_1 - \tilde B v_0 = A x_0 + c', \qquad x_{k+1} - A x_k - \tilde B v_k = c' \;\;(k = 1..N-1),\\
+& && \text{with } \tilde B = B\,\mathrm{diag}(\tau_{\text{scale}}),\\
+&\text{torque (hard):} && \tau_{\min}/\tau_{\text{scale}} \le v_k \le \tau_{\max}/\tau_{\text{scale}} \quad (\text{i.e. } -1 \le v_k \le 1),\\
+&\text{state (soft):} && x_k + s_k \ge x_{\text{lb}}, \qquad x_k - s_k \le x_{\text{ub}}, \qquad s_k \ge 0.
+\end{aligned} \]
+<span class="eqsrc">torque_mpc.py, _build_structure lines 184–236; numeric blocks written in _update lines 317–323</span>
+<p>with $x_{\text{lb}} = (q_{\min} + 0.02,\; -(1 - m)\,v_{\max})$ and $x_{\text{ub}} = (q_{\max} - 0.02,\; (1-m)\,v_{\max})$, where 0.02 rad is
+<code>joint_limit_margin</code>, $v_{\max}$ the datasheet speed limits, and $m$ = 0.005 the v0.4 velocity margin
+(default 0 in the class, 0.005 in <code>default.yaml</code>). The state constraints apply only at the knots
+$k = 1..N$, every 20 ms; nothing constrains the state between knots.</p>
+<table id="tab-qp-size">
+<caption>Size of the QP for N = 25 (computed from the code).</caption>
+<thead><tr><th>Block</th><th>Rows</th><th>Notes</th></tr></thead>
+<tbody>
+<tr><td>dynamics</td><td class="num">350</td><td>dense 14×14 $A$ and 14×7 $\tilde B$ blocks, values change every update</td></tr>
+<tr><td>torque bounds</td><td class="num">175</td><td>identity rows, hard</td></tr>
+<tr><td>soft state bounds</td><td class="num">1050</td><td>$x + s \ge$ lb, $x - s \le$ ub, $s \ge 0$</td></tr>
+<tr><td><strong>total</strong></td><td class="num"><strong>1575</strong></td><td>875 variables</td></tr>
+</tbody></table>
+<p><strong>Fixed sparsity, changing numbers.</strong> The constraint matrix pattern is assembled once in COO form and converted
+to CSC; the code records where each stage's $A$ and $\tilde B$ entries land in OSQP's CSC data array
+(<code>_a_idx</code>, <code>_b_idx</code>). Each update overwrites only those entries and the bounds, and calls
+<code>solver.update(q=…, l=…, u=…, Ax=…)</code>. Because the matrix values change, OSQP must refactor its KKT system at
+every update, measured at 18–22% of the update time (v0.4 report §7). Before updating, the code checks that all data
+are finite and $l \le u$, because OSQP 1.x silently ignores inconsistent bounds and returns the old solution
+(CLAUDE.md, "MPC facts").</p>
+
+<h2 id="s-mpc-osqp">Solver settings and warm start</h2>
+<pre class="src" data-src="controllers/torque_mpc.py, lines 126–133 (defaults; configs/default.yaml sets the same values)">self.settings = {"verbose": False, "eps_abs": 1e-5, "eps_rel": 1e-5,
+                 "max_iter": 500, "polishing": True, "warm_starting": True} | (solver_settings or {})</pre>
+<ul>
+<li>Accepted statuses: <code>solved</code> and <code>solved inaccurate</code> (line 68). Anything else, or a non-finite solution, raises.</li>
+<li><strong>Warm start</strong> (<code>_shifted</code>, line 372): the previous solution shifted by one interval (states, torques and slacks
+move one stage earlier; the last stage is repeated) is given to OSQP as the starting point. Mean iterations were
+45 on the demo motion (v0.4 report §7) and 37.7 in the traced demo run of Chapter 3.</li>
+<li>Rejected alternatives (measured): looser tolerance $10^{-4}$ needed <em>more</em> iterations; turning polishing off was
+25–30% faster but raised demo error from 2.8 to 29.6 µrad (v0.4 report §7).</li>
+</ul>
+
+<h2 id="s-mpc-ref">How the reference reaches the controller</h2>
+<p>The controller never imports tasks. The runner passes a callable <code>reference_preview(t)</code> that returns the task's
+$(q_{\text{ref}}, \dot q_{\text{ref}})$ at any time $t$ (<code>SimulationRunner._reference_preview</code>). At each update,
+<code>_references</code> (line 284) evaluates it at $t + kT_s$ for $k = 1..N$, giving the 25 future reference states
+$r_k$; the task's reference acceleration is not used by the MPC. Without a preview function the controller would
+extrapolate the current reference linearly. The preview means the MPC "sees" corners of the trajectory 0.5 s
+before reaching them.</p>
+
+<h2 id="s-mpc-loop">Between updates: holding, feedthrough and the observer</h2>
+<p><code>compute</code> (line 264) is called every 2 ms:</p>
+<ol>
+<li><code>observer.update(q, qd, dt)</code> folds in the newest measurement (every step, 500 Hz);</li>
+<li>if <code>self._step % substeps == 0</code>, run <code>_update</code>;</li>
+<li>output the held MPC torque, corrected by the change of the disturbance estimate since the last update:</li>
+</ol>
+\[ \tau(t) = \mathrm{clip}\!\left(\tau_{\text{MPC}} - \big(\hat d(t) - \hat d_{\text{update}}\big),\; \tau_{\min},\; \tau_{\max}\right) \]
+<span class="eqsrc">torque_mpc.py, compute, lines 275–278 (disturbance_feedthrough = true in default.yaml)</span>
+<p>This 500 Hz inner correction matters: with a 10 ms observer but without feedthrough, the push error was 7.1 mrad
+instead of 3.75 mrad, because the torque is otherwise frozen for 20 ms (v0.4 report §5).</p>
+
+<h2 id="s-mpc-fallback">Failure handling</h2>
+<p>Any exception inside <code>_update</code> (non-finite state, implausible linearization, inconsistent QP data, solver status
+not accepted) sets <code>_using_fallback = True</code> and clears the warm start. Until the next successful update,
+<code>compute</code> returns the fallback's command: plain computed-torque control (no observer, no integral), built by
+<code>build_ctc(..., fallback=True)</code>. The applied command is always recorded in <code>_applied</code>, and the next
+linearization and rate term are anchored to it. That design comes from the one implementation bug the project found
+in its MPC line: in v0.2 the servo MPC anchored to its own stale solution after a fallback, which cascaded into 275
+fallbacks out of 450 updates; anchoring to the applied command reduced them to 43 (v0.3 report §2). In the traced
+demo run there were 0 fallbacks.</p>
+
+<h2 id="s-mpc-mujoco">How the torque reaches MuJoCo</h2>
+<p><code>SimulationRunner.step</code> passes the returned 7-vector to <code>engine.set_arm_command</code>, which clips it to
+<code>ctrlrange</code> (±87/±12 Nm) and writes <code>data.ctrl</code>; <code>mj_step</code> applies it through the torque-motor
+actuators (gain 1, no bias), so <code>actuator_force</code> equals the command (<code>test_torque_command_is_applied_force</code>).
+Note one idealization: the command computed from the state at time $t$ is applied at time $t$, although on hardware the
+4–5 ms of computation would delay it.</p>
+
+<h2 id="s-mpc-assess">Where it is sophisticated, where it is simplified</h2>
+<table id="tab-mpc-assess">
+<caption>An honest assessment of the torque MPC.</caption>
+<thead><tr><th>Sophisticated</th><th>Simplified</th><th>Not accounted for at all</th></tr></thead>
+<tbody>
+<tr><td>
+<ul><li>Model from MuJoCo's own discrete dynamics (armature, damping, implicit integration), exact at the current state</li>
+<li>Hard, exact torque limits (the decision variable is the torque)</li>
+<li>Normalized variables; exact-penalty soft constraints sized so slack stays 0</li>
+<li>Reference preview over 0.5 s</li>
+<li>Offset-free via a discrete-inverse-dynamics disturbance observer with 500 Hz feedthrough</li>
+<li>Fixed-pattern sparse QP, in-place updates, warm start, polishing</li>
+<li>Validated fallback with correct re-anchoring</li></ul>
+</td><td>
+<ul><li>One linearization per update, used for all 25 stages (LTI); open-loop prediction error grows ~k³, reaching 2–5×10⁻² rad at the end of the horizon (v0.4 §2)</li>
+<li>Linearized at the held torque, not along the planned trajectory (no LTV / SQP)</li>
+<li>Constraints only at knots; between knots unchecked</li>
+<li>Disturbance assumed constant over 0.5 s</li>
+<li>Terminal weight only, no terminal constraint: stability shown empirically, not proven</li>
+<li>Velocity margin sized from measurements, not a robust-MPC certificate</li></ul>
+</td><td>
+<ul><li>Obstacles and self-collision (handled before motion by the planner)</li>
+<li>Contact forces, friction beyond viscous damping</li>
+<li>Acceleration and jerk limits; torque-rate limits (only penalized)</li>
+<li>Motor bandwidth and electrical dynamics</li>
+<li>Computation delay, sensor noise/delay (noise only in optional tests)</li>
+<li>Cartesian or orientation constraints</li></ul>
+</td></tr></tbody></table>

@@ -1,0 +1,72 @@
+<h1 class="chapter" id="ch-test">Testing and validation</h1>
+
+<p class="chapter-intro">How the 189 automated tests work, what kinds of claims they support, and which important behaviours they do not check.</p>
+
+<h2 id="s-how">How the tests run</h2>
+<p>The tests use <strong>pytest</strong>: every function named <code>test_…</code> in <span class="file">tests/</span> is collected and run;
+<code>assert</code> statements decide pass or fail; <code>@pytest.mark.parametrize</code> runs one function for several inputs (15 such
+decorators expand 157 test functions into 189 collected tests). Fixtures with <code>scope="module"</code> build expensive objects
+(engines, planners) once per file. All tests are headless; the one offscreen-render test skips if no OpenGL context exists. The
+full suite took 1 min 57 s to 2 min 44 s in the v0.5.2 session (<code>.\.venv\Scripts\python.exe -m pytest tests -q</code>).</p>
+
+<table id="tab-testfiles">
+<caption>Test files at commit 5dbeffd (function counts from the source; parametrization adds 32 more collected tests).</caption>
+<thead><tr><th>File</th><th>Functions</th><th>Covers</th></tr></thead>
+<tbody>
+<tr><td><code>test_simulation.py</code></td><td class="num">16</td><td>v0.1: model files, actuators, scenes, rendering, min-jerk, PID clamp, motion only through actuators, closed loop</td></tr>
+<tr><td><code>test_mpc.py</code></td><td class="num">23</td><td>v0.2: prediction vs rollout, no live-state writes, hidden external forces, constraints, fallbacks, controller selection, benchmark</td></tr>
+<tr><td><code>test_torque.py</code></td><td class="num">18</td><td>v0.3: torque variant properties, inverse dynamics, CTC, torque MPC holding, limits, feedback, fallback</td></tr>
+<tr><td><code>test_reach.py</code></td><td class="num">12</td><td>v0.3: FK/Jacobian, IK, rejection reasons, reach task, closed-loop reaching</td></tr>
+<tr><td><code>test_benchmark_v03.py</code></td><td class="num">3</td><td>v0.3: model mismatch reaches only model-based controllers</td></tr>
+<tr><td><code>test_trajectory.py</code></td><td class="num">11</td><td>v0.4: quintic constants, double-S exactness, time scaling, torque budget</td></tr>
+<tr><td><code>test_v04.py</code></td><td class="num">16</td><td>v0.4: violation reporting, tightening, observer, offset-free MPC, anti-windup, Routh bound, orientation, noise</td></tr>
+<tr><td><code>test_planning.py</code></td><td class="num">22</td><td>v0.5: checker, edge bound, RRT-Connect, budgets, shortcut, IK candidates, ground truth</td></tr>
+<tr><td><code>test_planning_demo.py</code></td><td class="num">11</td><td>v0.5: demo validity, reference feasibility and clearance, execution with both controllers, unsafe mode, CLI</td></tr>
+<tr><td><code>test_planning_benchmark.py</code></td><td class="num">4</td><td>v0.5: scenario claims, failure reasons, driver output</td></tr>
+<tr><td><code>test_robustness.py</code></td><td class="num">10</td><td>v0.5.1: geometry overrides, replanning, video writer, exact clearance, box-box behaviour</td></tr>
+<tr><td><code>test_clearance.py</code></td><td class="num">11</td><td>v0.5.2: exact box-box checking, fingertip cases, ground truth near obstacles, edge interpolation</td></tr>
+</tbody></table>
+
+<h2 id="s-kinds">Kinds of tests</h2>
+<table id="tab-kinds">
+<caption>Test categories with real examples.</caption>
+<thead><tr><th>Kind</th><th>What it establishes</th><th>Examples</th></tr></thead>
+<tbody>
+<tr><td><strong>Unit</strong></td><td>a small function computes the right value</td><td><code>test_min_jerk_boundary_conditions</code>, <code>test_quintic_peak_constants</code>, <code>test_pid_integral_is_clamped</code>, <code>test_rotation_angle_matches_axis_angle</code>, <code>test_coarse_to_fine_visits_every_interior_sample_once</code></td></tr>
+<tr><td><strong>Integration</strong></td><td>modules are wired correctly</td><td><code>test_controller_selected_by_config</code>, <code>test_torque_controllers_build_torque_engine</code>, <code>test_runner_plans_in_the_overridden_scene</code>, <code>test_planning_settings_carry_the_flag</code></td></tr>
+<tr><td><strong>Simulation (closed loop)</strong></td><td>the whole loop achieves a behaviour in MuJoCo</td><td><code>test_closed_loop_reaches_all_waypoints</code>, <code>test_torque_mpc_demo_tracking</code>, <code>test_offset_free_torque_mpc_rejects_push_and_stays_stable</code>, <code>test_planned_demo_executes_with_torque_mpc</code></td></tr>
+<tr><td><strong>Regression</strong></td><td>a fixed bug or a historical behaviour stays fixed</td><td><code>test_recovery_after_fallback_anchors_to_applied_command</code> (fails on v0.2 code), <code>test_unlimited_task_reproduces_v03_quintic</code>, <code>test_planning_on_free_joint_moves_matches_unplanned_task</code>, <code>test_checker_matches_exhaustive_distance_ground_truth</code> (midphase)</td></tr>
+<tr><td><strong>Numerical validation</strong></td><td>a numerical method agrees with an independent computation</td><td><code>test_prediction_matches_mujoco_rollout</code>, <code>test_fk_matches_engine_and_jacobian_matches_finite_differences</code>, <code>test_inverse_dynamics_reproduces_acceleration</code>, <code>test_double_s_is_exact_monotonic_and_within_limits</code></td></tr>
+<tr><td><strong>Isolation / safety properties</strong></td><td>a component cannot cheat or corrupt the simulation</td><td><code>test_prediction_never_modifies_live_state</code>, <code>test_external_forces_are_not_visible_to_the_model</code>, <code>test_observer_uses_controller_model_never_the_plant</code>, <code>test_arm_moves_only_through_actuators</code></td></tr>
+<tr><td><strong>Scenario validity</strong></td><td>experiment set-ups mean what they claim</td><td><code>test_waypoints_within_limits_and_collision_free</code>, <code>test_variant_start_is_valid_and_direct_move_blocked</code>, <code>test_execution_scenarios_have_valid_starts_goals_and_the_claimed_blockage</code></td></tr>
+<tr><td><strong>Behaviour pins</strong></td><td>an external library still behaves as assumed</td><td><code>test_mujoco_box_box_still_misses_this_margin_contact</code>, <code>test_box_box_penetration_is_always_detected</code></td></tr>
+<tr><td><strong>Benchmark smoke tests</strong></td><td>experiment drivers run and write outputs</td><td><code>test_benchmark_runs_and_writes_results</code>, <code>test_driver_reports_every_seed_and_execution_outcomes</code></td></tr>
+</tbody></table>
+<p><strong>Benchmarks are not tests.</strong> The benchmark scripts measure performance and write numbers; they assert nothing about
+the numbers. Tests assert properties (often with generous thresholds, such as "tracking error below a bound") so that they are
+robust to small numerical changes.</p>
+
+<h2 id="s-guar">Mathematical guarantees versus empirical observations</h2>
+<p>A test can only check finitely many cases. Some tests check a property that is also <em>proven</em> (the lever-arm bound holds for
+every posture by the triangle inequality; the test confirms the implementation matches the proof on random edges). Others check
+an <em>observation</em> with no proof behind it (that the torque MPC tracks the demo below a threshold; that the checker agreed with
+<code>mj_geomDistance</code> on 500 configurations). Neither kind proves correctness in general. The project's documentation is
+careful about this distinction; the planner's "15 mm" is a deduction with assumptions (Chapter 11), and the controllers' stability
+is empirical (Chapter 8).</p>
+
+<h2 id="s-gaps">What the tests do not validate</h2>
+<div class="box warning"><span class="lbl">Gaps</span>
+<ul>
+<li><strong>Real-time behaviour.</strong> No test checks timing; deadline overruns are only reported by benchmarks.</li>
+<li><strong>Quantitative benchmark claims.</strong> The numbers in the reports are not asserted anywhere; a regression that worsened tracking from
+2.8 µrad to 50 µrad could pass the suite if it stays under a test's threshold.</li>
+<li><strong>Viewer mode.</strong> <code>run_viewer</code> and its Windows thread-join workaround are not exercised (only path drawing into a scene, headless).</li>
+<li><strong>Self-collision between samples</strong>, and robot–environment clearance during <em>execution</em> beyond the specific runs tested.</li>
+<li><strong>Breadth of scenarios.</strong> Planning tests use a few scenes and starts; there is no randomized scenario generation or long-run statistics.</li>
+<li><strong>Realistic sensing.</strong> Only white Gaussian noise; no quantization, delay, filtering, or dropped measurements.</li>
+<li><strong>Model error beyond mass scaling</strong> (friction, damping, armature, centre of mass).</li>
+<li><strong>Servo MPC quality.</strong> Tests check it runs and falls back correctly, not that it tracks well (it does not, compared with PID).</li>
+<li><strong>Optimality of QP solutions</strong> for the torque MPC (the objective audit tool exists only for the servo MPC).</li>
+<li><strong>Documentation commands.</strong> Commands in README/reports are not executed by tests.</li>
+<li><strong>Grasping, pick-and-place, perception, replanning during motion</strong>: not implemented, hence not tested.</li>
+</ul></div>

@@ -1,0 +1,9 @@
+node_modules/
+frontend/dist/
+.venv/
+__pycache__/
+.pytest_cache/
+/build/
+/dist/
+# Local backup archive (383 MB, over GitHub's 100 MB file limit)
+/backend.zip

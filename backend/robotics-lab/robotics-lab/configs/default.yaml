@@ -1,0 +1,110 @@
+# Robotics Lab v0.4 default configuration.
+
+environment: table          # environments/<name>.xml: table | empty | obstacles
+
+task:
+  type: joint_target
+  move_time: 3.0            # seconds per minimum-jerk move
+  hold_time: 1.0            # seconds to hold each waypoint
+  loop: true
+  # Feasibility-checked timing (v0.4, tasks/trajectory.py). Each move takes at least
+  # move_time and is lengthened if it would exceed these fractions of the Franka
+  # datasheet limits or the torque budget (inverse dynamics of the controller's model).
+  # Remove this section for the unchecked v0.3 timing.
+  trajectory:
+    profile: min_jerk        # min_jerk (quintic) | double_s (jerk-limited, time-optimal)
+    velocity_scale: 0.9      # of robots/panda.py VELOCITY_LIMITS
+    acceleration_scale: 0.5  # of ACCELERATION_LIMITS
+    jerk_scale: 0.05         # of JERK_LIMITS (datasheet jerk limits are very high)
+    torque_scale: 0.8        # of the actuator torque limits; null = no torque check
+  # Arm joint angles in radians (joint1..joint7). All within Panda limits and
+  # collision-free above the table (checked by tests/test_simulation.py).
+  waypoints:
+    home:  [0.0, 0.0, 0.0, -1.57079, 0.0, 1.57079, -0.7853]
+    left:  [0.7, 0.2, 0.0, -2.0, 0.0, 2.2, 1.2]
+    right: [-0.7, 0.3, 0.0, -1.8, 0.0, 2.1, 0.4]
+
+controller:
+  # Controller and actuator model (the engine builds the Panda to match):
+  #   joint_pid, joint_mpc   -> Menagerie position servos (ctrl = joint-angle setpoint, rad)
+  #   torque_ctc, torque_mpc -> torque motors (ctrl = joint torque, Nm), same arm otherwise
+  # main.py --controller pid|mpc|ctc|torque_mpc overrides this.
+  type: joint_pid
+  # PID gains: used by joint_pid, and by joint_mpc as its fallback controller.
+  kp: 0.5                   # outer-loop gains on top of the Menagerie position servos
+  ki: 5.0
+  kd: 0.0
+  velocity_feedforward: 0.1 # cancels servo damping lag (Panda kd/kp = 0.1)
+  integral_limit: 0.05      # max setpoint offset from the integral term (rad)
+
+  # Model predictive control (controller.type: joint_mpc). See controllers/mpc.py.
+  mpc:
+    control_rate_hz: 50       # MPC update rate; must divide the 500 Hz physics rate (50 or 100 tested)
+    horizon: 15               # prediction intervals (15 x 20 ms = 0.3 s at 50 Hz)
+    linearization: power      # power (mjd_transitionFD, fast) | rollout (finite differences of the interval)
+    reference_preview: true   # true: future task reference over the horizon; false: extrapolate current reference
+    soft_constraints: true    # slack on torque/position/velocity limits (command limits are always hard)
+    command_slew_scale: 1.0   # setpoint may move at most scale * v_max * Ts per update (null = unlimited)
+    joint_limit_margin: 0.02  # rad kept clear of each joint limit
+    torque_limit_fraction: 0.95  # fraction of the actuator force range allowed for sustained torque
+    velocity_limits: null     # rad/s; null = Franka datasheet values from robots/panda.py
+    disturbance_gain: 0.0     # 0 disables the offset-free disturbance estimator (it hurt tracking in tests)
+    velocity_margin: 0.0      # QP keeps |qd| <= (1 - margin) v_max; does not help here (servo violations are intersample)
+    weights:
+      position: 1.0e+4         # per rad^2 (1e5 destabilized the loop in testing)
+      velocity: 10.0          # per (rad/s)^2
+      terminal: 5.0           # multiplier on the final stage
+      effort: 1.0             # per (sustained torque / torque limit)^2
+      command_rate: 1.0e+3     # per rad^2 of setpoint change between updates
+      slack_quadratic: 1.0e+3
+      slack_linear: 1.0e+5
+    solver:                   # passed to OSQP
+      eps_abs: 1.0e-5
+      eps_rel: 1.0e-5
+      max_iter: 500           # deterministic bound on solve time (~16 ms); typical solves take 25-40
+      polishing: true
+
+  # Computed-torque control (torque_ctc; also the fallback of torque_mpc).
+  ctc:
+    natural_frequency: 25.0   # rad/s of the error dynamics e'' + 2 zeta wn e' + wn^2 e = 0
+    damping_ratio: 1.0
+    integral_gain: 0.0        # ki (1/s^3) on the integrated error; must be < Kd Kp = 31250 (v0.4 option)
+    integral_limit: 0.1       # clamp on the integrated error (rad s), with conditional integration
+    disturbance_observer:     # v0.4 option (controllers/disturbance.py); off = v0.3 CTC baseline
+      enabled: false
+      time_constant: 0.01     # s; 5 ms rejects faster but triples torque jitter under sensor noise
+      limit_fraction: 0.5     # |d_hat| <= fraction of the torque limit
+
+  # Torque-level MPC (torque_mpc). See controllers/torque_mpc.py.
+  torque_mpc:
+    control_rate_hz: 50       # torque held for 20 ms between updates
+    horizon: 25               # 25 x 20 ms = 0.5 s preview (100 Hz x 30 overran its 10 ms budget under constraints)
+    linearization: power
+    reference_preview: true
+    soft_constraints: true    # slack on position/velocity limits; torque limits are always hard
+    joint_limit_margin: 0.02
+    velocity_limits: null     # null = Franka datasheet values
+    velocity_margin: 0.005    # v0.4 tightening: QP keeps |qd| <= 0.995 v_max (removed all actual violations)
+    disturbance_observer:     # v0.4 offset-free MPC; enabled: false gives the v0.3 torque MPC
+      enabled: true
+      time_constant: 0.01     # s (see docs/research/v0.4-results.md for the noise trade-off)
+      limit_fraction: 0.5
+      feedthrough: true       # correct the held torque at 500 Hz by the change of d_hat since the update
+    weights:
+      position: 1.0e+5        # stiffer than 1e4: push deflection 12 vs 25 mrad, tracking unchanged
+      velocity: 10.0
+      terminal: 5.0
+      effort: 1.0             # per (torque above gravity hold / torque limit)^2
+      torque_rate: 10.0       # per (torque change / torque limit)^2
+      slack_quadratic: 1.0e+3
+      slack_linear: 1.0e+6    # exact penalty must exceed constraint multipliers (1e5 was too weak at Q = 1e5)
+    solver:
+      eps_abs: 1.0e-5
+      eps_rel: 1.0e-5
+      max_iter: 500
+      polishing: true
+
+gripper: 255                # 0 = closed, 255 = open
+
+viewer:
+  realtime: true

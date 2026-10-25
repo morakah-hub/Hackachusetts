@@ -1,0 +1,58 @@
+<!--
+  ArmStrong scene: a round table with the Panda mounted at its centre.
+
+  The table top radius in this file is only a default. The studio measures the arm's top-down
+  grasp reach (studio/workspace.py) and sets the radius through environment_overrides
+  (geoms.table_top.size), so the table is exactly as large as the reachable work area plus a rim.
+  The objects on the table are free boxes added per scene through environment_overrides["objects"]
+  (simulation/engine.py add_free_box); this file defines none.
+
+  Table top surface at z = 0.75 m (a standard table height); the robot base sits on it at the
+  origin. place_marker (visual only) and the mocap target are required by the pick-and-place
+  supervisor and the engine.
+-->
+<mujoco model="studio_env">
+  <option timestep="0.002" integrator="implicitfast"/>
+
+  <visual>
+    <headlight diffuse="0.6 0.6 0.6" ambient="0.3 0.3 0.3" specular="0 0 0"/>
+    <global azimuth="150" elevation="-25"/>
+  </visual>
+
+  <statistic center="0.3 0 0.9" extent="1.4"/>
+
+  <asset>
+    <texture type="skybox" builtin="gradient" rgb1="0.3 0.5 0.7" rgb2="0 0 0" width="512" height="3072"/>
+    <material name="tabletop" rgba="0.82 0.80 0.76 1"/>
+    <material name="pedestal" rgba="0.28 0.29 0.31 1"/>
+    <material name="floor" rgba="0.55 0.56 0.58 1"/>
+    <material name="place" rgba="0.1 0.8 0.6 0.5"/>
+    <material name="target" rgba="1 0.1 0.1 0.6"/>
+  </asset>
+
+  <worldbody>
+    <light pos="0 0 3.2" dir="0 0 -1" directional="true"/>
+    <light pos="1.6 -1.6 2.8" dir="-1 1 -1.2" diffuse="0.4 0.4 0.4"/>
+    <geom name="floor" type="plane" size="0 0 0.05" material="floor"/>
+
+    <!-- Table: round top (radius set from the measured reach), central column and foot. -->
+    <body name="table" pos="0 0 0">
+      <geom name="table_top" type="cylinder" size="0.82 0.02" pos="0 0 0.73" material="tabletop"/>
+      <geom name="table_column" type="cylinder" size="0.11 0.345" pos="0 0 0.365" material="pedestal"/>
+      <geom name="table_foot" type="cylinder" size="0.45 0.01" pos="0 0 0.01" material="pedestal"/>
+    </body>
+
+    <!-- Placement target (visual only): moved per episode by the supervisor's case overrides. -->
+    <body name="place_marker" pos="0.5 0 0.78">
+      <geom name="place_marker" type="box" size="0.03 0.03 0.0005" material="place" contype="0" conaffinity="0"
+        group="5"/>
+    </body>
+
+    <site name="robot_mount" pos="0 0 0.75"/>
+
+    <!-- Visual-only target marker (mocap: moved kinematically, never collides). -->
+    <body name="target" mocap="true" pos="0.5 0 1.2">
+      <geom name="target_marker" type="sphere" size="0.01" material="target" contype="0" conaffinity="0" group="5"/>
+    </body>
+  </worldbody>
+</mujoco>

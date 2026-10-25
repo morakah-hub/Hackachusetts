@@ -1,0 +1,290 @@
+<h1 class="chapter" id="ch-tour">A complete repository tour</h1>
+
+<p class="chapter-intro">Every folder and every important file: what it is for, what it takes in and gives back, what depends on it, and whether it is still used. The descriptions come from reading the source at commit 5dbeffd, not from the README.</p>
+
+<h2 id="s-tree">The annotated directory tree</h2>
+
+<p>The repository root is <span class="file">C:\Users\rkhmh\robotics-lab</span>. Git tracks 451 objects
+(12.4 MB of history). The tree below lists every tracked file except the 70 files of the vendored robot
+model and the data files in <span class="file">docs/research</span>; line counts are from
+<code>wc -l</code>.</p>
+
+<pre>robotics-lab/
+├── main.py                  159  entry point: one simulation, viewer or headless (Ch. 3)
+├── benchmark.py              76  CLI: controller benchmark      → simulation/benchmark.py
+├── planning_benchmark.py     47  CLI: planner benchmark         → simulation/planning_benchmark.py
+├── robustness_experiment.py  46  CLI: wall-variant experiment   → simulation/robustness.py
+├── requirements.txt          11  mujoco 3.16.0, numpy, scipy, osqp, PyYAML, pytest, matplotlib
+├── README.md / CLAUDE.md         user guide / working rules and hard-won facts for developers
+├── robots/
+│   ├── panda.py             107  Panda: names, limits, home pose, MjSpec edits (torque motors, EE site)
+│   └── models/franka_emika_panda/   THIRD-PARTY: MuJoCo Menagerie MJCF + meshes (never edited)
+├── environments/             5 MJCF scenes: empty, table, obstacles, planning_demo, planning_narrow
+├── simulation/
+│   ├── engine.py            215  SimulationEngine: builds the scene, owns MjModel/MjData, steps physics
+│   ├── runner.py            440  SimulationRunner: config → engine + task + controller; control loop
+│   ├── kinematics.py        163  ArmKinematics: FK, Jacobian, DLS inverse kinematics, contact checks
+│   ├── benchmark.py         408  controller benchmark: scenarios, metrics, CSV/JSON/plots
+│   ├── planning_benchmark.py 407 planner benchmark: planning statistics + closed-loop execution
+│   └── robustness.py        348  wall-variant episodes, ExactClearance metric
+├── controllers/
+│   ├── base.py               34  Controller interface: reset(), compute(q, qd, q_ref, qd_ref, dt, t, qdd_ref)
+│   ├── pid.py                56  JointPIDController (position servos, v0.1)
+│   ├── prediction.py        311  MuJoCoPredictionModel: linearized MuJoCo dynamics x⁺ = Ax + Bu + c
+│   ├── mpc.py               543  JointMPCController: servo-setpoint MPC (v0.2) + shared MPC statistics
+│   ├── computed_torque.py    81  ComputedTorqueController (v0.3)
+│   ├── torque_mpc.py        380  TorqueMPCController (v0.3/v0.4) — the main controller
+│   ├── dynamics.py           44  ArmInverseDynamics: mj_inverse on scratch data
+│   └── disturbance.py        83  JointDisturbanceObserver (v0.4)
+├── tasks/
+│   ├── joint_target.py      156  JointTargetTask: waypoints → timed reference q(t), q̇(t), q̈(t)
+│   ├── trajectory.py        341  time scaling: quintic, double-S, feasibility checks (v0.4)
+│   ├── reach.py             135  CartesianReachTask: (x, y, z) targets via IK or the planner
+│   ├── planned_joint.py     105  PlannedJointTask: joint waypoints joined by planned paths (v0.5)
+│   └── pick_place.py          0  EMPTY placeholder, imported by nothing
+├── planning/                     v0.5 motion planning
+│   ├── collision.py         365  CollisionChecker: configuration/edge validity with clearance
+│   ├── rrt_connect.py       210  RRTConnect: bidirectional sampling planner
+│   ├── shortcut.py          106  pruning + random shortcuts, re-validated
+│   ├── ik.py                 86  ik_candidates: several collision-free IK postures
+│   ├── motion_planner.py    186  MotionPlanner facade: plan_joint / plan_to_position
+│   └── visualization.py      70  planned-path markers for the viewer (visual only)
+├── configs/                  7 YAML files: default, reach, planning_demo, benchmarks, wall variants
+├── tests/                   12 files, 157 test functions, 189 collected tests (Ch. 16)
+├── tools/                   11 scripts: audits, diagnostics, profilers, plots, video renderer
+├── docs/research/            reports v0.3–v0.5.2, worklogs, CSV data, 14 figures
+└── results/                  git-ignored benchmark outputs and videos (27 MB)</pre>
+
+<div class="box warning"><span class="lbl">Discrepancy found while reading</span>
+<p><span class="file">tasks/pick_place.py</span> exists but is empty (0 lines) since the very first commit
+(184bfd6). Nothing imports it. It marks a planned feature, not an implemented one. Likewise, the module
+docstring of <span class="file">simulation/runner.py</span> says the controller is "joint_pid or joint_mpc",
+but the code supports four types (<code>CONTROLLER_TYPES</code> also has <code>torque_ctc</code> and
+<code>torque_mpc</code>); the docstring was not updated in v0.3. The comment in
+<span class="file">configs/default.yaml</span> lists the environments as "table | empty | obstacles" and
+omits the two planning scenes, which do work.</p></div>
+
+<h2 id="s-arch">The architecture at a glance</h2>
+
+<p>The code follows one rule stated in <span class="file">CLAUDE.md</span>: modules are separated by role.
+Environments know nothing about robots; tasks only produce references; controllers only produce actuator
+commands; the planner runs before motion and is invisible to the controllers. <a class="ref" href="#fig-arch"></a>
+shows how the pieces connect during a run.</p>
+
+<figure id="fig-arch">
+<svg class="diagram" width="640" height="370" viewBox="0 0 640 370" xmlns="http://www.w3.org/2000/svg">
+  <defs><marker id="ar" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#44505c"/></marker></defs>
+  <g font-size="10.5">
+  <rect x="10" y="10" width="140" height="40" rx="5" fill="#fdf4e6" stroke="#b87414"/><text x="80" y="27" text-anchor="middle" font-weight="600">configs/*.yaml</text><text x="80" y="41" text-anchor="middle" font-size="9">load_config (extends:)</text>
+  <rect x="200" y="10" width="160" height="40" rx="5" fill="#e6edf3" stroke="#1f5f8b"/><text x="280" y="27" text-anchor="middle" font-weight="600">main.py / benchmarks</text><text x="280" y="41" text-anchor="middle" font-size="9">CLI overrides</text>
+  <rect x="200" y="80" width="160" height="44" rx="5" fill="#dfeaf3" stroke="#1f5f8b" stroke-width="2"/><text x="280" y="98" text-anchor="middle" font-weight="700">SimulationRunner</text><text x="280" y="113" text-anchor="middle" font-size="9">simulation/runner.py (wires everything)</text>
+  <rect x="10" y="160" width="150" height="58" rx="5" fill="#f3f5f7" stroke="#56636f"/><text x="85" y="178" text-anchor="middle" font-weight="600">SimulationEngine</text><text x="85" y="192" text-anchor="middle" font-size="9">environment XML + Panda</text><text x="85" y="205" text-anchor="middle" font-size="9">MjModel / MjData, mj_step</text>
+  <rect x="180" y="160" width="130" height="58" rx="5" fill="#f6f0fb" stroke="#7a4fa3"/><text x="245" y="178" text-anchor="middle" font-weight="600">MotionPlanner</text><text x="245" y="192" text-anchor="middle" font-size="9">IK candidates, RRT-Connect,</text><text x="245" y="205" text-anchor="middle" font-size="9">shortcut, CollisionChecker</text>
+  <rect x="330" y="160" width="140" height="58" rx="5" fill="#e8f3ec" stroke="#3f8f5a"/><text x="400" y="178" text-anchor="middle" font-weight="600">Task</text><text x="400" y="192" text-anchor="middle" font-size="9">JointTarget / Reach / Planned</text><text x="400" y="205" text-anchor="middle" font-size="9">+ trajectory timing</text>
+  <rect x="490" y="160" width="140" height="58" rx="5" fill="#eaf1fa" stroke="#3a6ea8"/><text x="560" y="178" text-anchor="middle" font-weight="600">Controller</text><text x="560" y="192" text-anchor="middle" font-size="9">PID | servo MPC | CTC |</text><text x="560" y="205" text-anchor="middle" font-size="9">torque MPC (+ observer)</text>
+  <line x1="150" y1="30" x2="198" y2="30" stroke="#44505c" marker-end="url(#ar)"/>
+  <line x1="280" y1="50" x2="280" y2="78" stroke="#44505c" marker-end="url(#ar)"/>
+  <line x1="230" y1="124" x2="100" y2="158" stroke="#44505c" marker-end="url(#ar)"/>
+  <line x1="260" y1="124" x2="245" y2="158" stroke="#44505c" marker-end="url(#ar)"/>
+  <line x1="300" y1="124" x2="390" y2="158" stroke="#44505c" marker-end="url(#ar)"/>
+  <line x1="330" y1="124" x2="550" y2="158" stroke="#44505c" marker-end="url(#ar)"/>
+  <line x1="310" y1="189" x2="328" y2="189" stroke="#7a4fa3" stroke-width="1.8" marker-end="url(#ar)"/>
+  <text x="250" y="232" font-size="8.5" fill="#7a4fa3">planned joint path (once, before motion)</text>
+  <!-- loop -->
+  <rect x="40" y="265" width="560" height="92" rx="8" fill="none" stroke="#1f5f8b" stroke-dasharray="5 4"/>
+  <text x="50" y="281" font-size="9.5" fill="#1f5f8b" font-weight="600">every physics step, dt = 2 ms (SimulationRunner.step)</text>
+  <rect x="60" y="292" width="110" height="46" rx="4" fill="#e8f3ec" stroke="#3f8f5a"/><text x="115" y="311" text-anchor="middle" font-size="9.5">task.reference(t)</text><text x="115" y="326" text-anchor="middle" font-size="8.5">q_ref, q̇_ref, q̈_ref</text>
+  <rect x="200" y="292" width="130" height="46" rx="4" fill="#eaf1fa" stroke="#3a6ea8"/><text x="265" y="311" text-anchor="middle" font-size="9.5">controller.compute(…)</text><text x="265" y="326" text-anchor="middle" font-size="8.5">MPC re-solves every 10 steps</text>
+  <rect x="360" y="292" width="110" height="46" rx="4" fill="#f3f5f7" stroke="#56636f"/><text x="415" y="311" text-anchor="middle" font-size="9.5">set_arm_command</text><text x="415" y="326" text-anchor="middle" font-size="8.5">clip to ctrlrange</text>
+  <rect x="500" y="292" width="80" height="46" rx="4" fill="#f3f5f7" stroke="#56636f"/><text x="540" y="311" text-anchor="middle" font-size="9.5">mj_step</text><text x="540" y="326" text-anchor="middle" font-size="8.5">physics</text>
+  <line x1="170" y1="315" x2="198" y2="315" stroke="#44505c" marker-end="url(#ar)"/>
+  <line x1="330" y1="315" x2="358" y2="315" stroke="#44505c" marker-end="url(#ar)"/>
+  <line x1="470" y1="315" x2="498" y2="315" stroke="#44505c" marker-end="url(#ar)"/>
+  <path d="M540,338 L540,350 L265,350 L265,340" fill="none" stroke="#44505c" marker-end="url(#ar)"/>
+  <text x="400" y="348" font-size="8.5" fill="#44505c">measured q, q̇ (feedback)</text>
+  </g>
+</svg>
+<figcaption>Architecture of a run. Configuration flows into <code>SimulationRunner</code>, which builds the
+engine, optionally the planner, the task and the controller. The planner runs once, while the task is
+being built. During motion only the dashed loop runs, 500 times per simulated second.</figcaption>
+</figure>
+
+<h2 id="s-owned">Project code, third-party code, data and history</h2>
+
+<p>Not everything in the folder is "the project". It helps to know which bytes are ours, which are other
+people's, and which are generated.</p>
+
+<table id="tab-owned">
+<caption>Categories of content in the repository folder.</caption>
+<thead><tr><th>Category</th><th>Where</th><th>Tracked by Git?</th><th>Notes</th></tr></thead>
+<tbody>
+<tr><td>Project source (Python)</td><td>root scripts, <code>simulation/</code>, <code>controllers/</code>, <code>tasks/</code>, <code>planning/</code>, <code>robots/panda.py</code></td><td>yes</td><td>about 7,000 lines including tools; this is what the guide documents</td></tr>
+<tr><td>Configuration and scenes</td><td><code>configs/</code>, <code>environments/</code></td><td>yes</td><td>YAML and MJCF; small</td></tr>
+<tr><td>Tests</td><td><code>tests/</code></td><td>yes</td><td>2,673 lines, 189 tests</td></tr>
+<tr><td>Third-party robot model</td><td><code>robots/models/franka_emika_panda/</code></td><td>yes (vendored)</td><td>Apache-2.0, 34.6 MB of meshes; never edited</td></tr>
+<tr><td>Third-party Python packages</td><td><code>.venv/</code></td><td>no (.gitignore)</td><td>409 MB: SciPy 117 MB, MuJoCo 62 MB, NumPy 55 MB, Matplotlib 33 MB, PyOpenGL 30 MB</td></tr>
+<tr><td>Research documentation</td><td><code>docs/research/</code></td><td>yes</td><td>reports, worklogs, CSV copies of results, figures</td></tr>
+<tr><td>Generated results</td><td><code>results/</code></td><td>no (.gitignore)</td><td>27 MB; videos 14 MB; each benchmark run writes a folder</td></tr>
+<tr><td>Caches</td><td><code>__pycache__/</code>, <code>.pytest_cache/</code></td><td>no</td><td>regenerated automatically</td></tr>
+<tr><td>Git history</td><td><code>.git/</code></td><td>—</td><td>13.8 MB, 18 commits from 14 to 19 Oct 2026</td></tr>
+</tbody></table>
+
+<figure id="fig-disk">
+<img class="w80" src="../figures/fig_disk.svg" alt="disk usage">
+<figcaption>Disk usage by category (measured with <code>du</code> on 19 Oct 2026, before this guide was
+added). The installed third-party packages outweigh the project's own code by a factor of about 200.</figcaption>
+</figure>
+
+<h2 id="s-mod-robot">robots/ and environments/</h2>
+
+<p><strong><span class="file">robots/panda.py</span></strong> defines the frozen dataclass <code>Panda</code>, a
+name-level description of the robot: joint names (<code>joint1</code>…<code>joint7</code>), actuator names,
+the base body <code>link0</code>, the end-effector site <code>ee_site</code>, the home pose
+<code>HOME_QPOS</code>, and the datasheet velocity, acceleration and jerk limits. Its method
+<code>load_spec()</code> loads the Menagerie XML into an editable <code>mujoco.MjSpec</code>, adds the
+end-effector site 0.1034 m below the hand body (between the fingertips), and, for
+<code>actuation="torque"</code>, calls <code>_make_torque_actuators</code>, which rewrites actuators 1–7
+from position servos to direct torque motors with the same force limits. <em>Input</em>: the actuation
+choice. <em>Output</em>: an <code>MjSpec</code>. <em>Used by</em>: <code>SimulationEngine</code> and the tests.</p>
+
+<p><strong><span class="file">environments/*.xml</span></strong> are MuJoCo scene files. Each must provide a
+<code>robot_mount</code> site, a mocap body named <code>target</code> (the red marker sphere, which cannot
+collide), and the <code>implicitfast</code> integrator with a 2 ms timestep. They are pure data and are
+read by <code>build_spec</code>.</p>
+
+<h2 id="s-mod-sim">simulation/</h2>
+
+<p><strong><span class="file">engine.py</span> — <code>SimulationEngine</code>.</strong> <code>build_spec(environment,
+robot, overrides)</code> loads the scene, applies optional geometry overrides (v0.5.1), attaches the robot
+at the mount site, and excludes base-table contact. The constructor compiles the model and creates
+<code>MjModel</code>/<code>MjData</code>, then caches index arrays: <code>arm_qpos_adr</code>,
+<code>arm_dof_adr</code> (where the arm joints live in MuJoCo's state vectors), actuator ids, joint limits
+and command limits. Methods: <code>reset(arm_qpos)</code> (the <em>only</em> place joint positions are
+written), <code>arm_qpos()</code>, <code>arm_qvel()</code>, <code>ee_position()</code>,
+<code>set_arm_command(ctrl)</code> (clips to the actuator command range), <code>step()</code>,
+<code>apply_external_force()</code> (for push tests), <code>perturbed_model(mass_scale)</code> (a copy with
+wrong masses for mismatch experiments), <code>forward_kinematics(q)</code> and <code>robot_contacts()</code>.
+The attribute <code>controller_model</code> is the model handed to model-based controllers; it equals the
+plant model unless a mismatch experiment replaces it. Used by almost everything.</p>
+
+<p><strong><span class="file">runner.py</span> — <code>SimulationRunner</code></strong> is the
+<em>composition root</em>: the one place that knows about every other module. <code>load_config</code>
+reads YAML with single inheritance (<code>extends:</code>). <code>build_controller</code> and its helpers
+(<code>build_pid</code>, <code>build_mpc</code>, <code>build_ctc</code>, <code>build_torque_mpc</code>,
+<code>build_observer</code>) construct controllers from config. The runner's <code>_build_task</code> builds
+the task (and the planner if enabled); <code>step()</code> is the control loop body;
+<code>run_headless()</code> returns a <code>RunLog</code>; <code>run_viewer()</code> opens MuJoCo's passive
+viewer and paces the simulation to wall-clock time. Chapter 3 walks through it line by line.</p>
+
+<p><strong><span class="file">kinematics.py</span> — <code>ArmKinematics</code></strong> computes forward kinematics
+(<code>fk</code>, <code>fk_pose</code>), the 3×7 end-effector Jacobian (<code>jacobian</code>, via
+<code>mj_jacSite</code>), damped-least-squares inverse kinematics (<code>solve_ik</code>), contact queries
+(<code>contacts</code>, <code>path_contacts</code>) and the v0.3 "IK + straight-path collision check"
+planner <code>plan_target</code>. It also provides <code>rotation_angle</code> for orientation metrics. It
+always works on private scratch data. Used by the runner, the planner (<span class="file">planning/ik.py</span>),
+the benchmarks and the video tool.</p>
+
+<p><strong><span class="file">benchmark.py</span>, <span class="file">planning_benchmark.py</span>,
+<span class="file">robustness.py</span></strong> are experiment drivers. They build runner configurations for
+each (controller, scenario) or (scenario, seed) pair, run them headless, compute metrics from the simulated
+robot (never from controller predictions) and write CSV/JSON/Markdown/plots to <code>results/</code>.
+<code>robustness.py</code> also defines <code>ExactClearance</code>, an independent distance measurement
+with <code>mj_geomDistance</code> over every robot–environment geom pair. Chapter 15 covers the experiments.</p>
+
+<h2 id="s-mod-ctrl">controllers/</h2>
+
+<table id="tab-ctrl-files">
+<caption>The controller modules.</caption>
+<thead><tr><th>File / class</th><th>Inputs → outputs</th><th>Depends on</th><th>Status</th></tr></thead>
+<tbody>
+<tr><td><code>base.py</code> <code>Controller</code></td><td>abstract <code>reset()</code>, <code>compute(q, q̇, q_ref, q̇_ref, dt, t, q̈_ref)</code> → command</td><td>—</td><td>interface of all four</td></tr>
+<tr><td><code>pid.py</code> <code>JointPIDController</code></td><td>tracking error → servo setpoint (rad)</td><td>base</td><td>active (default controller; also servo-MPC fallback)</td></tr>
+<tr><td><code>prediction.py</code> <code>MuJoCoPredictionModel</code></td><td>(q, q̇, u) → affine model A, B, c over one control interval; gravity torque</td><td>MuJoCo</td><td>used by both MPCs</td></tr>
+<tr><td><code>mpc.py</code> <code>JointMPCController</code></td><td>state + reference preview → servo setpoint via OSQP</td><td>prediction, pid</td><td>active but weaker than PID (Ch. 9); <code>MPCStats</code> and helpers reused by the torque MPC</td></tr>
+<tr><td><code>dynamics.py</code> <code>ArmInverseDynamics</code></td><td>(q, q̇, q̈) → τ via <code>mj_inverse</code></td><td>MuJoCo</td><td>used by CTC, observer, trajectory torque check</td></tr>
+<tr><td><code>computed_torque.py</code> <code>ComputedTorqueController</code></td><td>error → τ = ID(q, q̇, q̈_des)</td><td>dynamics, disturbance</td><td>active; torque-MPC fallback</td></tr>
+<tr><td><code>disturbance.py</code> <code>JointDisturbanceObserver</code></td><td>measured motion + applied τ → disturbance estimate d̂ (Nm)</td><td>dynamics</td><td>on by default in the torque MPC</td></tr>
+<tr><td><code>torque_mpc.py</code> <code>TorqueMPCController</code></td><td>state + preview → τ via OSQP</td><td>prediction, disturbance, mpc helpers</td><td>active; the main research controller</td></tr>
+</tbody></table>
+
+<h2 id="s-mod-tasks">tasks/</h2>
+
+<p>A task turns a description of the goal into a <em>reference</em>: a function of time returning a
+<code>Reference(q, qd, waypoint_index, qdd)</code>. Tasks never touch the simulation.</p>
+<ul>
+<li><strong><code>JointTargetTask</code></strong> (<span class="file">joint_target.py</span>): moves along straight
+joint-space lines between waypoints, each move timed by <code>plan_segment</code> and followed by a hold.
+Optional per-move durations (<code>move_times</code>, <code>hold_times</code>) support planned via points.
+Can loop.</li>
+<li><strong><span class="file">trajectory.py</span></strong>: the timing laws (<code>quintic</code>, <code>DoubleS</code>),
+<code>KinematicLimits</code>, <code>plan_segment</code> (lengthens a move until velocity, acceleration, jerk
+and torque limits hold, or raises <code>TrajectoryInfeasible</code>) and <code>check_reference</code>.</li>
+<li><strong><code>CartesianReachTask</code></strong> (<span class="file">reach.py</span>): resolves each (x, y, z)
+target through an injected <code>plan</code> function (either IK + straight-path check, or the motion
+planner), skips unreachable targets with a reason, and builds an internal <code>JointTargetTask</code>.</li>
+<li><strong><code>PlannedJointTask</code></strong> (<span class="file">planned_joint.py</span>): like
+<code>JointTargetTask</code> but each move follows a planned path; raises <code>PlanningFailed</code> if any
+move cannot be planned.</li>
+</ul>
+
+<h2 id="s-mod-plan">planning/</h2>
+<ul>
+<li><strong><code>CollisionChecker</code></strong> (<span class="file">collision.py</span>): is a configuration valid
+(inside joint limits minus 0.05 rad, no contact, ≥ 20 mm from the environment)? Is a straight edge between
+two configurations valid at all its samples? Works on a private deep copy of the model with contact margins,
+midphase disabled, and (since v0.5.2) exact distances for box-box pairs. Chapter 11.</li>
+<li><strong><code>RRTConnect</code></strong> (<span class="file">rrt_connect.py</span>): the bidirectional
+rapidly-exploring random tree planner with time/node/iteration budgets. Chapter 10.</li>
+<li><strong><code>shortcut</code></strong>, <code>prune</code> (<span class="file">shortcut.py</span>): shorten a
+valid path while keeping it valid.</li>
+<li><strong><code>ik_candidates</code></strong> (<span class="file">ik.py</span>): many IK solutions from
+different seeds, filtered by the checker, sorted by distance from the start.</li>
+<li><strong><code>MotionPlanner</code></strong> (<span class="file">motion_planner.py</span>): facade with
+<code>plan_joint(q_start, q_goal)</code> and <code>plan_to_position(target, q_from)</code> returning a
+<code>MotionPlan</code>; <code>PlanningSettings.from_config</code> parses the YAML section.</li>
+<li><strong><span class="file">visualization.py</span></strong>: draws the planned end-effector curves into the
+viewer scene (green executed, orange raw). Visual only.</li>
+</ul>
+
+<h2 id="s-mod-tools">tests/, tools/, configs/ and docs/</h2>
+
+<p><strong>tests/</strong> holds 12 pytest files (Chapter 16). <strong>tools/</strong> holds one-off investigation
+scripts that were used to produce specific report sections; they are not part of the run-time system:</p>
+<table class="small" id="tab-tools">
+<caption>Investigation and reporting tools.</caption>
+<thead><tr><th>Tool</th><th>Purpose (from its docstring)</th><th>Version</th></tr></thead>
+<tbody>
+<tr><td><code>audit_mpc_objective.py</code></td><td>checks the servo MPC's QP objective and constraints term by term</td><td>v0.3</td></tr>
+<tr><td><code>audit_fallback.py</code></td><td>why the servo MPC hit its iteration budget in the wrist scenario</td><td>v0.3</td></tr>
+<tr><td><code>sweep_mpc_variants.py</code>, <code>time_mpc.py</code></td><td>config-variant sweeps; median update timing</td><td>v0.3</td></tr>
+<tr><td><code>diagnose_torque_mpc.py</code></td><td>instrumented torque-MPC runs for the fast/wrist investigation</td><td>v0.4</td></tr>
+<tr><td><code>profile_mpc.py</code></td><td>MPC timing breakdown at 50 and 100 Hz</td><td>v0.4</td></tr>
+<tr><td><code>plot_v04.py</code>, <code>plot_v05.py</code></td><td>report figures from saved results</td><td>v0.4, v0.5</td></tr>
+<tr><td><code>render_demo_video.py</code></td><td>offscreen-rendered animated WebP demo video</td><td>v0.5.1/v0.5.2</td></tr>
+<tr><td><code>audit_clearance.py</code></td><td>MuJoCo distance queries vs certified distances per geom pair type</td><td>v0.5.2</td></tr>
+<tr><td><code>profile_collision.py</code></td><td>collision-checker cost and correctness, v0.5 vs v0.5.2</td><td>v0.5.2</td></tr>
+</tbody></table>
+
+<p><strong>configs/</strong>: <code>default.yaml</code> (joint waypoints, PID, all controller settings),
+<code>reach.yaml</code> (Cartesian targets), <code>planning_demo.yaml</code> (the wall demo, torque MPC,
+planning on), <code>benchmark.yaml</code> and <code>benchmark_robustness.yaml</code> (controller
+benchmarks), <code>benchmark_planning.yaml</code> (planner benchmark), <code>robustness_wall.yaml</code>
+(six wall variants). <strong>docs/research/</strong>: one report per milestone from v0.3, worklogs, CSV copies of the
+key results and the figures used in this guide.</p>
+
+<h2 id="s-deps">Who depends on whom</h2>
+
+<p>The import graph (computed from the source with <code>grep</code>) has a clear layering with a few
+exceptions that Chapter 13 analyses:</p>
+<ul>
+<li><code>robots</code> → nothing in the project; <code>simulation/engine</code> → <code>robots</code>.</li>
+<li><code>controllers</code> → only <code>controllers</code> (and MuJoCo); they never import tasks, planners or the engine.
+The MPC gets future references only through a callable injected by the runner (<code>reference_preview</code>).</li>
+<li><code>tasks</code> → only <code>tasks</code>; the planner is injected as a function.</li>
+<li><code>planning</code> → <code>planning</code> and <code>simulation/kinematics</code> (for IK).</li>
+<li><code>simulation/runner</code> → everything (composition root); <code>main.py</code> and the benchmark drivers → runner.</li>
+<li>Exceptions: <code>torque_mpc.py</code> imports private helpers (<code>_per_joint</code>, <code>MPCStats</code>,
+<code>plan_violations</code>) from the servo <code>mpc.py</code>; <code>planning_benchmark.py</code> and
+<code>robustness.py</code> import each other (one import is deferred inside a function to avoid a cycle);
+<code>controllers/__init__.py</code> still exports only the v0.2 classes.</li>
+</ul>

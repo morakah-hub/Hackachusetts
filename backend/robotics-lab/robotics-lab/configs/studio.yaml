@@ -1,0 +1,93 @@
+# ArmStrong (studio/, studio.py): browser app over the v0.6 pick-and-place supervisor.
+#
+#   ..\..\.venv\Scripts\python.exe studio.py        # http://127.0.0.1:8770
+#
+# Every task step is one physical PickPlaceEpisode (simulation/manipulation.py) in the studio scene
+# (environments/studio.xml): known world, the box moves only through contact and friction. The other
+# objects on the table are free boxes too and count as obstacles for the planner and the contact monitor.
+
+extends: pick_place.yaml
+
+environment: studio
+
+controller:
+  type: torque_ctc            # CTC + disturbance observer (v0.6): fastest validated configuration
+  ctc:
+    disturbance_observer:
+      enabled: true
+
+pick_place:
+  table_height: 0.75          # must match environments/studio.xml (table top surface)
+  collision:
+    # Fingertips may pass 4 mm above the table while they are around the object (descend, lift, lower,
+    # retreat), so 30 mm tall objects can be grasped. Every other robot-environment pair keeps 20 mm.
+    finger_table_min: 0.004
+  # Approach and pre-place postures must allow the straight descent / lowering that follows (a posture near
+  # a joint limit ended a check run at "pose IK failed at s = 0.857" during the descent).
+  straight_line_postures: true
+  # Carry along a constant-orientation arc around the base (simulation/manipulation.py _carry_arc) when it is
+  # feasible and collision-free, else plan a joint-space path as in v0.6. Long joint-space swings tilted the
+  # hand by up to 24 deg and let 0.4 kg boxes slide 10 mm along the pads in check runs.
+  transport: arc
+  timing:
+    carry_speed: 0.3          # m/s average end-effector speed requested for the arc (lengthened to the limits)
+  grasp:
+    approach_height: 0.10
+    lift_height: 0.10
+    retreat_height: 0.10
+
+cases: []                     # the studio builds its own cases from the scene
+
+studio:
+  robot:
+    id: panda
+    name: Franka Emika Panda
+    # Franka Emika Panda datasheet: 3 kg payload, 855 mm maximum reach, 7 axes; Franka Hand: 80 mm
+    # stroke, 70 N continuous grasping force. In this simulation the hand squeezes with ~37 N
+    # (robot.gripper_stiffness in pick_place.yaml); a 3.0 kg box held and was placed in a check run,
+    # a 3.5 kg box slipped out during transport.
+    payload_kg: 3.0
+    datasheet_reach_m: 0.855
+    gripper_stroke_m: 0.08
+    home: [0.0, 0.0, 0.0, -1.57079, 0.0, 1.57079, -0.7853]
+  objects:
+    # Box proxy limits for a top-down parallel grasp. The fingers must open to the object width + 20 mm
+    # before the retreat (release check) and open to 80 mm at most (a 60 mm carton failed that check at
+    # 80.0 mm in a check run), so the side across the fingers is at most 58 mm. The palm sits 37 mm above the
+    # grasp point, the fingertips 9 mm below it.
+    min_grasp_width_m: 0.015
+    max_grasp_width_m: 0.058
+    min_height_m: 0.030
+    max_height_m: 0.250
+    max_footprint_m: 0.300    # longest side
+    min_mass_kg: 0.01
+    max_tilt_deg: 10.0        # an object lying more tilted cannot be grasped from the top
+    gap_m: 0.015              # minimum free gap between object footprints when placing
+  grasp_depth:                # grasp point below the object top: clamp(height / 2 - offset, min, max)
+    offset_m: 0.015           # 60 mm box -> 15 mm below the top (the validated v0.6 grasp)
+    min_m: 0.015
+    max_m: 0.028              # palm (37 mm above the grasp point) stays >= 9 mm above the top
+  workspace:
+    # The table is sized from the measured reach: top-down grasp + pre-grasp IK, collision-checked, for
+    # every probe height and gripper yaw. The usable ring keeps a margin inside the measured limits.
+    probe_heights_m: [0.04, 0.12, 0.25]
+    yaws_deg: [0, 45, 90, 135]
+    azimuth_step_deg: 10
+    radial_step_m: 0.01
+    margin_m: 0.02            # usable ring = measured [r_min, r_max] shrunk by this on both sides
+    min_ring_width_m: 0.30    # azimuths whose reachable band is narrower are excluded
+    table_rim_m: 0.06         # table radius = usable outer radius + rim
+    # The ring is reachable all around, but carrying across the back would need joint 1 beyond its +-166 deg
+    # range, so the sector behind the base is kept clear (applied on top of the measurement).
+    max_azimuth_deg: 135
+  carry:
+    # Swings around the base longer than this are split into legs with a put-down in between: in kinematic
+    # checks a constant-orientation carry arc was feasible for some grasp orientation in 42/42 random moves
+    # up to 120 deg and in 15/28 between 120 and 180 deg (joint 7 has to counter-rotate by the swing).
+    max_swing_deg: 110
+    clearance_m: 0.04         # carried object's bottom above every other object's top while carrying
+    min_lift_m: 0.10
+    max_lift_m: 0.25
+  run:
+    speed: 1.0                # simulated seconds per wall-clock second (0 = as fast as possible)
+    snapshot_hz: 60

@@ -1,0 +1,176 @@
+<div class="part">Part I — Understanding the Project<small>What Robotics Lab is, what is in the repository, and what actually happens, line by line, when you run it.</small></div>
+
+<h1 class="chapter" id="ch-what">What is Robotics Lab?</h1>
+
+<p class="chapter-intro">A first look: the robot, the simulator, the problems the project tries to solve, and the vocabulary used in the rest of the guide.</p>
+
+<h2 id="s-why">Why this project exists</h2>
+
+<p>Robotics Lab is a <strong>simulation platform for a robot arm</strong>. It contains no hardware and no
+real robot. A computer model of a seven-joint industrial research arm, the Franka Emika Panda, is
+simulated by the physics engine MuJoCo, and our Python code decides what torques the arm's
+motors apply at every instant. The goal is to build, piece by piece and with measured evidence, the
+software stack a real autonomous manipulator needs:</p>
+<ol>
+<li><strong>Move accurately.</strong> Given a desired joint trajectory, make the simulated arm follow it
+with small error while respecting motor torque limits and joint speed limits (control).</li>
+<li><strong>Move to places, not just joint angles.</strong> Given a desired hand position in space, find
+joint angles that put the hand there (inverse kinematics).</li>
+<li><strong>Avoid obstacles.</strong> When the obvious motion would hit something, find a different
+collision-free route with a safety margin (motion planning and collision checking).</li>
+<li><strong>Be honest about it.</strong> Measure every claim with reproducible experiments and automated tests,
+and record failures and limitations alongside successes.</li>
+</ol>
+<p>The fourth point shapes the whole repository. Most of its 7,000 lines of project Python are
+the controller, planner and simulation code. A large share, however, consists of benchmarks, audit tools
+and 189 automated tests, and every milestone has a written research report in
+<span class="file">docs/research/</span>.</p>
+
+<p>Simulation comes first because it is cheap, repeatable and safe. A controller bug that drives a
+real Panda into a table can damage an expensive robot; in MuJoCo it just produces a number in a CSV file.
+Simulation also gives perfect measurements (the exact joint angles, the exact distance to an
+obstacle), which makes it possible to test whether an algorithm is correct before asking whether it
+is robust to sensor noise. The price is the <em>reality gap</em>: anything learned in simulation
+needs to be checked again on hardware. This project has not crossed that gap (Chapter 17).</p>
+
+<h2 id="s-robot">The robot: a Franka Emika Panda</h2>
+
+<p>The Panda is a collaborative robot arm widely used in research labs. It has <strong>seven revolute
+(rotating) joints</strong> in a chain from the base to the hand, plus a two-finger parallel gripper.
+Seven joints give it one more degree of freedom than the six needed to place a hand at an arbitrary
+position and orientation in 3-D space, so it is <em>redundant</em>: the same hand position can be reached
+with a whole family of arm postures (elbow up, elbow down and everything between).</p>
+
+<div class="box verified"><span class="lbl">Verified in source code</span>
+<p>The arm model is a verbatim copy of Google DeepMind's MuJoCo Menagerie Panda
+(<span class="file">robots/models/franka_emika_panda/</span>, commit d7b481b recorded in
+<span class="file">SOURCE.txt</span>). It is never edited; every change (torque motors, an end-effector
+site) is made in code by <span class="file">robots/panda.py</span>. The arm's total mass in the model
+is 17.45 kg. Joint limits come from the XML; speed, acceleration and jerk limits from the Franka
+datasheet are constants in <span class="file">robots/panda.py</span>
+(<code>VELOCITY_LIMITS</code> = 2.175 rad/s for joints 1–4 and 2.61 rad/s for joints 5–7). The motor
+torque limits are 87 Nm (joints 1–4) and 12 Nm (joints 5–7).</p></div>
+
+<p>The Menagerie model ships with <strong>position servos</strong>: you command a desired joint angle and a
+stiff spring-damper inside the simulator pulls the joint there. In v0.3 the project added a
+<strong>torque-motor</strong> variant in which our code commands the joint torques directly, which is how
+modern research controllers are usually written. Both variants exist side by side
+(<code>Panda(actuation="position")</code> or <code>"torque"</code>), and the choice of controller selects
+the variant automatically (Chapter 3).</p>
+
+<h2 id="s-env">The environment and the physics engine</h2>
+
+<p><strong>MuJoCo</strong> ("Multi-Joint dynamics with Contact") is an open-source physics engine designed for
+robotics and control research. Given the robot's current state (joint angles and velocities) and the
+motor commands, it computes how the state changes over one small time step, including gravity,
+inertia, joint friction-like damping, motor limits and contact forces when bodies touch. Calling it
+repeatedly advances simulated time. In this project one physics step is
+<strong>2 ms</strong> (500 steps per simulated second), with MuJoCo's <code>implicitfast</code> integrator.</p>
+
+<p>An <strong>environment</strong> is a MuJoCo scene file in <span class="file">environments/</span>: a floor,
+usually a table, sometimes obstacles. The robot is attached at runtime to a site named
+<code>robot_mount</code>, so scene files know nothing about robots. There are five scenes:
+<code>empty</code>, <code>table</code>, <code>obstacles</code> (a box and a cylinder on the table),
+<code>planning_demo</code> (a wall across the table) and <code>planning_narrow</code> (the wall plus a
+ceiling, leaving a 34 cm gap).</p>
+
+<figure id="fig-scene">
+<img class="w80" src="../figures/repo_video_frames.png" alt="video stills">
+<figcaption>Stills from the project's demo video: the Panda reaches over a wall
+(<code>planning_demo</code> scene). Green: executed end-effector path; orange: raw planner path; red: the
+blocked straight-line motion. Source: <span class="file">docs/research/figures/v0.5.1_video_frames.png</span>,
+rendered by <span class="file">tools/render_demo_video.py</span>.</figcaption>
+</figure>
+
+<h2 id="s-does">What the software currently does</h2>
+
+<p>As of v0.5.2 the software can, entirely in simulation:</p>
+<ul>
+<li>drive the arm through a list of joint-angle waypoints, or to a list of hand positions, with four
+interchangeable controllers: a PID outer loop on the position servos, a servo-setpoint model
+predictive controller (MPC), computed-torque control (CTC) and a torque-level MPC;</li>
+<li>generate smooth joint trajectories whose timing is automatically stretched until they respect
+the velocity, acceleration, jerk and torque limits;</li>
+<li>estimate unknown disturbance torques (pushes, wrong masses) and compensate them;</li>
+<li>plan collision-free motions around known obstacles with a sampling-based planner (RRT-Connect),
+keeping 20 mm of clearance at every checked configuration, and shorten the resulting paths;</li>
+<li>replan when the obstacle geometry is different at the start of an episode;</li>
+<li>measure all of this in benchmarks that report tracking error, constraint violations, contacts,
+clearances and solver timing.</li>
+</ul>
+<p>It does <strong>not</strong> perceive the world (no cameras), does not replan during motion, does not grasp
+objects, has no learning component, and has never controlled a real robot. Chapter 17 gives a
+precise capability matrix.</p>
+
+<h2 id="s-layers">Simulation, planning, control, perception, learning</h2>
+
+<p>These five words are used loosely in everyday speech; in robotics they name distinct layers with
+different inputs, outputs and time scales. Keeping them apart is the single most useful habit for
+understanding this project.</p>
+
+<table id="tab-layers">
+<caption>The layers of a robot software stack and where each stands in Robotics Lab.</caption>
+<thead><tr><th>Layer</th><th>Question it answers</th><th>Typical rate</th><th>In this project</th></tr></thead>
+<tbody>
+<tr><td><strong>Simulation</strong></td><td>Given motor commands, how does the world move?</td><td>500 Hz here (2 ms)</td><td>MuJoCo, wrapped by <span class="file">simulation/engine.py</span>. Replaces the real world.</td></tr>
+<tr><td><strong>Perception</strong></td><td>What is around the robot, and where?</td><td>10–60 Hz (cameras)</td><td>Absent. Obstacle geometry is read from the scene file: the planner is given the truth.</td></tr>
+<tr><td><strong>Planning</strong></td><td>Which route through space reaches the goal without collision?</td><td>once per task here</td><td><span class="file">planning/</span>: IK postures, RRT-Connect, shortcutting, collision checking. Runs once before motion starts.</td></tr>
+<tr><td><strong>Trajectory generation</strong></td><td>How fast should the robot move along that route?</td><td>once per task</td><td><span class="file">tasks/trajectory.py</span>: time-scaled minimum-jerk or double-S profiles.</td></tr>
+<tr><td><strong>Control</strong></td><td>Which motor commands make the arm follow the trajectory now?</td><td>50–500 Hz</td><td><span class="file">controllers/</span>: PID, servo MPC, CTC, torque MPC.</td></tr>
+<tr><td><strong>Learning</strong></td><td>How can behaviour improve from data?</td><td>offline</td><td>Absent. No trained model anywhere in the code.</td></tr>
+</tbody></table>
+
+<p>A frequent confusion is to expect the controller to avoid obstacles. In this design it cannot: the
+controllers receive only a joint reference and the measured joint state, and know nothing about
+walls. Obstacle avoidance happens <em>before</em> motion, in the planner, and the controllers keep the
+arm on the planned route. Chapter 9 explains why closed-loop MPC alone does not give obstacle
+avoidance.</p>
+
+<h2 id="s-auto">What is autonomous and what is predefined</h2>
+
+<p>"Autonomous" means that the robot itself chooses actions to achieve a goal. Here is what the
+robot decides and what a human decided in advance:</p>
+<table id="tab-autonomy">
+<caption>Decisions made by the software versus decisions fixed by a person.</caption>
+<thead><tr><th>Decided by the software at run time</th><th>Fixed in advance by a person</th></tr></thead>
+<tbody>
+<tr><td>Joint angles that reach a requested hand position (IK, with several candidate postures)</td><td>The goal positions or joint waypoints themselves (YAML config)</td></tr>
+<tr><td>A collision-free route around known obstacles (random-sampling planner)</td><td>The obstacle geometry (scene files, optional overrides)</td></tr>
+<tr><td>The duration of each motion segment, to respect limits</td><td>The limits and safety fractions (YAML)</td></tr>
+<tr><td>Every motor torque, 50–500 times per second, from measured state</td><td>Controller type, gains, weights, horizons (YAML)</td></tr>
+<tr><td>Rejecting an unreachable or blocked goal, with a reason</td><td>What to do next after a rejection (nothing: the target is skipped)</td></tr>
+</tbody></table>
+<p>So the robot is autonomous at the level of <em>motion</em> (how to get there safely) but not at
+the level of <em>tasks</em> (what to do and why). There is no perception, no task planner and no
+decision-making beyond "reach the listed targets in order".</p>
+
+<h2 id="s-vision">The long-term vision</h2>
+
+<p>The project's own documents state the direction: next pick-and-place, then reinforcement learning
+and other learning methods (<span class="file">CLAUDE.md</span>, "Planned next: pick-and-place. RL and
+learning come later"). The pieces built so far (accurate torque control, feasibility-aware
+trajectories, collision-aware planning with clearance, and a careful evaluation harness) are the
+foundation such work needs. Chapters 18–20 discuss what would have to be added: perception,
+world models, reactive replanning, grasping, and how learned components could plug into the
+existing interfaces.</p>
+
+<h2 id="s-terms">Terminology introduced in this chapter</h2>
+<p>These terms are used everywhere later; Appendix A defines them again together with everything
+else.</p>
+<table class="small" id="tab-terms1">
+<caption>Core vocabulary.</caption>
+<thead><tr><th>Term</th><th>Meaning in this guide</th></tr></thead>
+<tbody>
+<tr><td>Degree of freedom (DOF)</td><td>An independent way the robot can move; the Panda arm has 7 (one per joint), the gripper 2 more (two finger slides, mechanically coupled).</td></tr>
+<tr><td>Configuration $q$</td><td>The vector of the 7 joint angles; it fixes the pose of every link.</td></tr>
+<tr><td>Joint space / Cartesian space</td><td>Describing motion by joint angles $q$ versus by the hand's position $(x, y, z)$ in metres.</td></tr>
+<tr><td>End effector (EE)</td><td>The working point of the robot; here a site between the fingertips, 0.1034 m from the hand body.</td></tr>
+<tr><td>Actuator</td><td>The motor model at a joint; position servo (command = angle) or torque motor (command = torque).</td></tr>
+<tr><td>Plant</td><td>The system being controlled: the simulated Panda.</td></tr>
+<tr><td>Reference / setpoint</td><td>The desired value the controller tries to achieve (a joint trajectory).</td></tr>
+<tr><td>Tracking error</td><td>Reference minus measured value; the primary quality metric.</td></tr>
+<tr><td>Controller</td><td>Code that turns reference and measurement into actuator commands, called every 2 ms.</td></tr>
+<tr><td>Planner</td><td>Code that finds a collision-free route before motion begins.</td></tr>
+<tr><td>Clearance</td><td>Minimum distance between robot and environment; the planner targets ≥ 20 mm at checked configurations.</td></tr>
+<tr><td>Episode / seed</td><td>One run of an experiment / the number that fixes the random choices so the run is reproducible.</td></tr>
+</tbody></table>

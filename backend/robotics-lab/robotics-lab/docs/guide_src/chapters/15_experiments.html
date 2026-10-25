@@ -1,0 +1,154 @@
+<h1 class="chapter" id="ch-exp">Complete experiment and benchmark review</h1>
+
+<p class="chapter-intro">Every experiment in the repository: what it tested, what was varied and measured, how success was defined, how many runs it had, what it found, and what limits its conclusions. All numbers are quoted from the reports and CSV files in <span class="file">docs/research/</span>; none were re-run for this guide.</p>
+
+<h2 id="s-exp-overview">Overview</h2>
+<table class="small" id="tab-exp-overview">
+<caption>The experiments, in order of appearance.</caption>
+<thead><tr><th>#</th><th>Experiment (version, driver)</th><th>Question</th><th>Runs</th></tr></thead>
+<tbody>
+<tr><td>E1</td><td>Controller benchmark (v0.2–v0.4, <code>benchmark.py</code>)</td><td>How accurately and within which limits does each controller track each reference?</td><td>7 controllers × 10 scenarios, 1 deterministic run each</td></tr>
+<tr><td>E2</td><td>Fast/wrist diagnosis (v0.4, <code>diagnose_torque_mpc.py</code>)</td><td>Why does torque MPC lag on fast/wrist?</td><td>~20 instrumented variants</td></tr>
+<tr><td>E3</td><td>Robustness sweep (v0.4, <code>benchmark_robustness.yaml</code>)</td><td>How do controllers degrade under mass error, pushes and noise?</td><td>5 controllers × 9 mass scales + 8 disturbances + noise</td></tr>
+<tr><td>E4</td><td>MPC timing profile (v0.4, <code>profile_mpc.py</code>)</td><td>Does each MPC fit its deadline? Where does time go?</td><td>5 variants × 4 repeats</td></tr>
+<tr><td>E5</td><td>Midphase ground truth (v0.5)</td><td>Does margin-based checking miss near misses?</td><td>3,000 configurations per scene</td></tr>
+<tr><td>E6</td><td>Planning benchmark (v0.5, re-run v0.5.2, <code>planning_benchmark.py</code>)</td><td>Success, time, path quality, clearance; then closed-loop execution</td><td>11 scenarios × 20 seeds; 24 + 6 executions</td></tr>
+<tr><td>E7</td><td>Wall-avoidance demo (v0.5, <code>main.py</code>)</td><td>Does the integrated system avoid the wall?</td><td>5 configurations of the demo</td></tr>
+<tr><td>E8</td><td>Wall-variant replanning (v0.5.1, re-run v0.5.2, <code>robustness_experiment.py</code>)</td><td>Does replanning handle changed obstacle geometry? Are old plans unsafe?</td><td>6 variants × 5 seeds; 60 executions</td></tr>
+<tr><td>E9</td><td>Box-box isolation and audit (v0.5.1, v0.5.2, <code>audit_clearance.py</code>)</td><td>Which MuJoCo distance answers are reliable?</td><td>20,000 poses (v0.5.1); 11 × 4,000 (v0.5.2)</td></tr>
+<tr><td>E10</td><td>Checker profile, before/after (v0.5.2, <code>profile_collision.py</code>)</td><td>Cost and correctness of the fix on real planner workloads</td><td>44,616 + 3 × 2,000 configurations; 4 × 10 plans</td></tr>
+</tbody></table>
+
+<h2 id="s-e1">E1 — Controller benchmark</h2>
+<ul>
+<li><strong>Independent variables:</strong> controller (PID, servo MPC 50/100 Hz, CTC, CTC + observer, torque MPC v0.3, torque MPC v0.4)
+and scenario (<code>demo</code>, <code>fast</code>, <code>wrist</code>, <code>near_limits</code>, <code>reach</code>, <code>demo_mismatch</code>, <code>push</code>, and the
+v0.4 <code>fast_feasible</code>, <code>wrist_feasible</code>, <code>wrist_feasible_dsc</code>).</li>
+<li><strong>Dependent variables:</strong> joint and end-effector tracking error (max, RMS), orientation error, settling time, velocity and
+joint-limit violations, torque saturation, contacts, MPC solver statistics.</li>
+<li><strong>Conditions:</strong> table scene, home start, 2 ms implicitfast physics, exact controller model unless stated, no noise, open
+gripper.</li>
+<li><strong>Success criteria:</strong> none fixed in advance; controllers are compared, and constraint violations are reported separately from
+tracking error.</li>
+<li><strong>Key results:</strong> Chapters 6 and 9 (torque MPC 0.0028 mrad vs CTC 0.063 vs PID 3.42 on <code>demo</code>; 3–30× MPC advantage over
+CTC on feasible references; servo MPC worse than PID except on <code>reach</code> and <code>push</code>).</li>
+<li><strong>Limitations:</strong> each cell is one deterministic trajectory; references are a handful of hand-picked waypoint sets; results with
+the exact plant model are an upper bound on what a real robot would achieve.</li>
+</ul>
+
+<h2 id="s-e2">E2 — Fast/wrist diagnosis</h2>
+<p>Varied: speed limit on/off, move duration, solver tolerance, warm start, hard vs soft constraints, weights, horizon, rate.
+Measured: tracking error, planned vs actual peak speed, prediction error versus a nonlinear rollout. Result: infeasible reference
+as primary cause; preview length the only setting that mattered (N = 10: 594, 25: 532, 40: 439 mrad on wrist); one-interval
+prediction accurate to 7e-6 rad; open-loop error growing ~k³ to 2–5e-2 rad at the end of the horizon (Chapter 9). Strength:
+the result is backed by an analytic lower bound (147 / 304 mrad) independent of the controller.</p>
+
+<h2 id="s-e3">E3 — Robustness sweep</h2>
+<p>Varied: controller-model mass and inertia scale 0.75–1.25 (plant nominal); external forces (30 N in ±x, ±y, −z on the hand, 40 N on
+link 4, during motion, combined with mass error); white sensor noise (1e-4 rad, 1e-3 rad/s, fixed seed). Measured: max/RMS error,
+settling, orientation. Results in Chapter 9: the observer reduces error 3.6–11×; CTC + observer is best on every disturbance test.
+Limitations: only uniform mass scaling; friction, damping, armature and centre-of-mass errors never varied; noise is white Gaussian
+only.</p>
+
+<h2 id="s-e4">E4 — Timing</h2>
+<p>Measured per update: linearization, OSQP update, OSQP solve, rest. Wall-clock times varied 2–3× between runs on the same
+machine (a calibration <code>mj_step</code> varied from 26 to 85 µs), so the report gives the quietest of four runs plus the range.
+Iteration counts are deterministic. Conclusion: 50 Hz fits on a quiet machine, 100 Hz does not (Chapter 9).</p>
+
+<h2 id="s-e5">E5 — Midphase ground truth</h2>
+<p>Random configurations (3,000 per scene) compared the checker's verdict with exhaustive <code>mj_geomDistance</code> over all
+robot–environment pairs. With the midphase on, it missed 14 of 91 (<code>planning_demo</code>) and 16 of 74 (<code>obstacles</code>) near
+misses; with it off, 0 false negatives and 0 false positives, at 24–26 µs per check. This experiment is now a permanent test.</p>
+
+<h2 id="s-e6">E6 — Planning benchmark</h2>
+<ul>
+<li><strong>Part 1, planning only:</strong> 11 scenarios × seeds 0–19. Five success scenarios (free, wall, obstacle block, narrow passage,
+multi-IK), one deliberately weakened (random-only IK seeds), five failure scenarios (unreachable, start in collision, goal in
+collision, 5 ms timeout, 8-node budget). Measured: success and status, time (IK + RRT + shortcut), nodes, collision checks,
+path length before/after shortcutting, vertices, independent re-validation, clearance.</li>
+<li><strong>Success criterion:</strong> a path that an independently built checker re-validates; failure scenarios must fail with their
+documented status.</li>
+<li><strong>Part 2, execution:</strong> 4 scenarios × 2 controllers (torque MPC, CTC) × 3 seeds, plus the unchecked direct move once per
+controller in 3 scenes. Success: reach the target (within 1 mm) with zero robot contact steps.</li>
+</ul>
+<div class="box measured"><span class="lbl">Reported results (v0.5 report §8, v0.5.2 report §6)</span>
+<ul>
+<li>All success scenarios 20/20 except the weakened one (12/20); every failure scenario failed 20/20 with its own status, except
+<code>node_budget</code> where seed 3 happened to fit inside 8 nodes (reported as a success).</li>
+<li>Shortcutting removed 46–63% of the raw joint-space length on average.</li>
+<li>All 24 planned executions succeeded: 0 contacts, final hand error 0.005–0.100 mm (the IK tolerance, not the controller, dominates).</li>
+<li>All 6 unchecked direct executions collided: 1,005–1,581 contact steps, stalling 175–470 mm from the goal.</li>
+<li>v0.5.2 re-run: identical success rates; with the old checker 3/113 plans had exact clearance below 20 mm (worst 18.54 mm), with the
+new one 0; minimum executed clearance 20.0 mm (exact).</li>
+</ul></div>
+<p><strong>Limitations:</strong> 20 seeds per scenario; one start/goal per scenario; timing noise ±25–30% between sessions; deadline
+overruns during this benchmark were wall-clock effects on a machine with ~0.4 GB free memory (an earlier full run was stopped for low
+memory), shown by bit-identical runs reporting 0, 10 and 12 overruns.</p>
+
+<h2 id="s-e7">E7 — The wall-avoidance demonstration</h2>
+<figure id="fig-demo-clear"><img class="w80" src="../figures/repo_v05_demo_clearance.png" alt="demo clearance">
+<figcaption>Clearance along the executed demo (from <span class="file">docs/research/figures/v0.5_demo_clearance.png</span>, v0.5; measured with the
+contact-based monitor of that version).</figcaption></figure>
+<table class="small" id="tab-demo-runs">
+<caption>Variants of the demo (v0.5 report §7; first row re-run for v0.5.2, Chapter 3).</caption>
+<thead><tr><th>Run</th><th>Outcome</th></tr></thead>
+<tbody>
+<tr><td>planning on, torque MPC (v0.5.2)</td><td>both direct edges blocked; plans 217 / 268 ms; 4.39 → 1.41 rad and 4.74 → 1.19 rad (4 vertices each); final hand error 0.02 / 0.05 mm; 0 contact steps; 0 fallbacks</td></tr>
+<tr><td>planning on, CTC (v0.5)</td><td>same plans; 0.01 / 0.05 mm; 0 contact steps</td></tr>
+<tr><td>other planning seed (v0.5)</td><td>different routes (1.92 → 1.32, 3.47 → 1.48 rad); 0 contacts</td></tr>
+<tr><td>planning off (v0.5)</td><td>right target rejected ("collision on path: wall-link6"); arm stays clear</td></tr>
+<tr><td>planning off, checks disabled (v0.5)</td><td>1,849 contact steps; stuck 307 mm from the goal</td></tr>
+</tbody></table>
+<p>Engineering significance: the full stack works end to end in simulation (IK, planning, time scaling, torque MPC, physics) and the
+negative control shows that the wall is a real obstacle. It is one start and two targets, so it is a demonstration, not a statistical result.</p>
+
+<h2 id="s-e8">E8 — Obstacle-geometry variation</h2>
+<ul>
+<li><strong>Independent variables:</strong> wall variant (nominal, 10 cm taller, 8 cm thicker, shifted 8 cm towards the goal, 15 cm longer,
+taller and thicker) and planning seed (0–4).</li>
+<li><strong>Dependent variables:</strong> validity and penetration depth of the previous episode's plan in the new geometry ("old plan"), replanning
+success and time, path length, path clearance (contact-based and exact), execution success, contacts, final error, tracking error.</li>
+<li><strong>Conditions:</strong> geometry known exactly at episode start (no perception, no replanning during motion); same start and target.</li>
+<li><strong>Success:</strong> final hand error ≤ 1 mm and zero robot contacts.</li>
+</ul>
+<figure id="fig-variants"><img class="w90" src="../figures/repo_v051_robustness_paths.png" alt="variant paths">
+<figcaption>Planned paths per wall variant (from <span class="file">docs/research/figures/v0.5.1_robustness_paths.png</span>).</figcaption></figure>
+<div class="box measured"><span class="lbl">Reported results (v0.5.1 brief §3, v0.5.2 report §6.5)</span>
+<ul>
+<li>Replanning 30/30; executions 60/60 (torque MPC and CTC) with 0 contact steps; max final error 0.085 mm.</li>
+<li>Old plans were invalid in all 20 episodes whose change affected the swept region (taller, thicker, shifted, taller-thicker),
+penetrating the new wall by 3–67 mm across episodes (worst case per variant −13.4 to −67.0 mm), and valid in all 10 others.</li>
+<li>v0.5.2: paths changed in 29/30 episodes (mostly &lt; 0.03 rad); executed exact minimum clearance 19.92 → 20.01 mm; median planning time
+0.213 → 0.298 s.</li>
+</ul></div>
+<p>Engineering significance: re-checking a cached plan costs one path validation and is necessary; reusing plans blindly would have
+driven into the wall in two thirds of these episodes. The experiment demonstrates replanning with <em>known</em> geometry, not reaction to
+changes during motion.</p>
+
+<h2 id="s-e910">E9 and E10 — The collision-checker investigation</h2>
+<p>Covered in detail in Chapter 11. In short: 44,000 audited poses showed that only MuJoCo's box-box margin contacts are unreliable
+(208 false "safe" answers, closest 1.85 mm); the v0.5.2 fix removed all decision errors on the planner's real workload (v0.5: 0 false
+safe, 91 false alarms out of 44,616) at a cost of ~25 µs per check and 6–46% longer planning.</p>
+
+<h2 id="s-stats">Statistical limitations</h2>
+<div class="box derived"><span class="lbl">How much does "0 failures" prove?</span>
+<p>If an event has probability $p$ per trial, the chance of seeing zero events in $n$ independent trials is $(1-p)^n$. Setting this to
+5% gives the "rule of three": with 95% confidence, $p \lesssim 3/n$. For the wall-variant experiment's 0/30 planning failures this
+bound is about 10%; for 0/60 execution failures about 5%; for the planning benchmark's 0/20 per scenario about 15%. These experiments
+therefore show the methods work in these settings; they do not show failure rates below a few percent. (And the trials are not fully
+independent: same start, target and machine.)</p></div>
+<ul>
+<li><strong>Deterministic single runs.</strong> Controller benchmarks are deterministic: re-running gives identical tracking numbers. That makes
+them excellent regression tests but means each scenario is a sample of one trajectory, not a distribution.</li>
+<li><strong>Narrow task families.</strong> One wall geometry family, one start, one target; a handful of waypoint sets.</li>
+<li><strong>Timing is not reproducible.</strong> Wall-clock numbers vary 2–3× with machine load; only iteration counts and node counts are exact.</li>
+<li><strong>Measurement instruments changed.</strong> v0.5/v0.5.1 clearance columns used MuJoCo contacts (inaccurate for box-box pairs);
+v0.5.2 columns are exact. Clearance numbers across versions are not directly comparable.</li>
+</ul>
+
+<h2 id="s-repro">Reproducibility</h2>
+<p>All simulations start from fixed states, all random choices use fixed seeds, and versions are recorded in every results file. The
+v0.4 report re-ran the v0.3 baseline and matched every tracking and constraint metric (MPC differences ≤ 1.6e-9 rad from
+floating-point round-off). v0.5.2 re-ran v0.5.1's planning in v0.5 mode and reproduced all 30 path lengths exactly. Planning is
+deterministic as long as no wall-clock budget ends a search. Raw outputs go to the git-ignored <code>results/</code>; copies of the key tables
+are committed as CSV in <span class="file">docs/research/</span>. Appendix D lists the commands.</p>

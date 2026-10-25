@@ -1,0 +1,42 @@
+<div class="part">Part VI — Toward Autonomous Robotics<small>An honest inventory of today's capabilities, and how perception, reactive planning and manipulation could be built on top of them.</small></div>
+
+<h1 class="chapter" id="ch-cap">What can the robot do today?</h1>
+
+<p class="chapter-intro">A precise capability matrix, with the evidence behind each rating.</p>
+
+<h2 id="s-matrix">The capability matrix</h2>
+<p>Four ratings are used. <strong>Implemented and verified</strong>: in the code, covered by tests, and measured in experiments.
+<strong>Implemented, incompletely validated</strong>: in the code and working in the tested cases, but with important conditions untested.
+<strong>Partially implemented</strong>: some building blocks exist, the capability does not. <strong>Not implemented</strong>: nothing in the code.</p>
+
+<table id="tab-cap">
+<caption>Capability matrix at v0.5.2 (simulation only throughout).</caption>
+<thead><tr><th>Capability</th><th>Rating</th><th>Evidence and conditions</th></tr></thead>
+<tbody>
+<tr><td>Joint-space motion control (PID, CTC, torque MPC)</td><td style="color:#3f8f5a"><strong>Implemented and verified</strong></td><td>Benchmarks E1, E3; tests in <code>test_simulation</code>, <code>test_torque</code>, <code>test_v04</code>. Torque MPC 2.8 µrad on demo; torque limits exact; speed limits within 0.5%.</td></tr>
+<tr><td>Disturbance and model-error rejection</td><td style="color:#3f8f5a"><strong>Implemented and verified</strong> (for tested cases)</td><td>Observer: pushes up to 40 N, uniform mass errors ±25%. Not tested: friction, damping, CoM errors, realistic sensors.</td></tr>
+<tr><td>Feasible trajectory generation</td><td style="color:#3f8f5a"><strong>Implemented and verified</strong></td><td><code>tasks/trajectory.py</code>; <code>test_trajectory.py</code>; velocity, acceleration, jerk and torque limits; infeasibility reported.</td></tr>
+<tr><td>Reaching Cartesian positions (IK)</td><td style="color:#3f8f5a"><strong>Implemented and verified</strong></td><td>Position only, 0.1 mm tolerance; orientation free; unreachable and colliding targets rejected with reasons.</td></tr>
+<tr><td>Collision-aware motion planning</td><td style="color:#3f8f5a"><strong>Implemented and verified</strong></td><td>RRT-Connect, 20 mm clearance at checked configurations, 15 mm deduced between samples; E6; 20/20 in tested scenes.</td></tr>
+<tr><td>Known-world obstacle avoidance during execution</td><td style="color:#3f8f5a"><strong>Implemented and verified</strong> (static, known obstacles)</td><td>24/24 planned executions and 60/60 wall-variant executions with 0 contacts; relies on tracking the plan; controllers are obstacle-unaware.</td></tr>
+<tr><td>Changing environments (between episodes)</td><td style="color:#b87414"><strong>Implemented, incompletely validated</strong></td><td>Geometry overrides and replanning at episode start, old-plan re-checking (E8). Only one wall family, 5 seeds each; geometry must be supplied exactly.</td></tr>
+<tr><td>Dynamic replanning during motion</td><td style="color:#c0392b"><strong>Not implemented</strong></td><td>Planning happens once at task construction; nothing monitors the world during motion.</td></tr>
+<tr><td>Perception (cameras, depth, point clouds)</td><td style="color:#c0392b"><strong>Not implemented</strong></td><td>The planner reads obstacle geometry from the MuJoCo model. MuJoCo can render images (used only for the video).</td></tr>
+<tr><td>Object grasping</td><td style="color:#c0392b"><strong>Not implemented</strong></td><td>The gripper actuator exists but is held open (255) in every task; no grasp planning, no contact-rich control.</td></tr>
+<tr><td>Pick-and-place</td><td style="color:#b87414"><strong>Partially implemented</strong> (building blocks only)</td><td>Reaching, planning, timing and torque control exist; <code>tasks/pick_place.py</code> is an empty file; no objects in the scenes.</td></tr>
+<tr><td>Learning (RL, imitation, learned models)</td><td style="color:#c0392b"><strong>Not implemented</strong></td><td>No trained model or dataset; MPC is optimization-based, not learned.</td></tr>
+<tr><td>AI-driven task planning</td><td style="color:#c0392b"><strong>Not implemented</strong></td><td>Tasks are fixed lists of targets in YAML, executed in order; no task-level reasoning.</td></tr>
+<tr><td>Multi-robot support</td><td style="color:#c0392b"><strong>Not implemented</strong></td><td>The engine attaches exactly one Panda; indices and controllers assume one arm.</td></tr>
+<tr><td>Real hardware deployment</td><td style="color:#c0392b"><strong>Not implemented</strong></td><td>No robot drivers, no real-time loop, no safety layer; all results are simulated with an exact model.</td></tr>
+</tbody></table>
+
+<h2 id="s-achieved">What has genuinely been achieved</h2>
+<p>Within simulation, the project has a complete, measured <em>motion layer</em> for a 7-DOF arm: given goals and known obstacles, it
+finds collision-free routes with a stated clearance, times them within actuator limits, and executes them with very accurate
+torque-level control that rejects moderate disturbances. Each claim has tests and an experiment behind it, and the known
+weaknesses are documented, including two MuJoCo behaviours that would otherwise have silently invalidated the clearance claims.</p>
+
+<h2 id="s-notachieved">What has not been achieved</h2>
+<p>The robot does not perceive, does not react to changes during motion, does not manipulate objects, does not learn, does not
+decide what to do, and has never run on hardware. Statements such as "the robot avoids obstacles" are true only for obstacles
+that are known exactly in advance and do not move.</p>

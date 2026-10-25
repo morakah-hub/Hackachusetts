@@ -1,0 +1,119 @@
+# v0.6 known-world pick-and-place (simulation/manipulation.py, pick_place.py).
+#
+#   .\.venv\Scripts\python.exe pick_place.py                          # development cases, headless
+#   .\.venv\Scripts\python.exe pick_place.py --case dev_free_1 --viewer
+#
+# Known world: object pose, size and obstacles come from the simulator (ground truth); no perception.
+# The object is moved only by simulated contact and friction.
+
+extends: default.yaml
+
+environment: pick_place     # environments/pick_place.xml (pick_place_obstacle.xml: + one static box)
+
+robot:
+  # Menagerie gripper servo: 100 N/m on the finger tendon squeezes a 50 mm box with 2.5 N in total,
+  # enough for ~0.25 kg at friction 1. 1500 N/m gives ~37 N (18.75 N per finger), below the real
+  # Franka Hand's 70 N continuous grasp force. Same actuator, ctrl range and force range (100 N).
+  gripper_stiffness: 1500.0   # N/m on the split tendon
+  gripper_damping: 20.0       # N s/m
+
+physics:
+  # Contact solver of the plant (and of every model copied from it). With MuJoCo's default pyramidal
+  # friction cone the soft contacts let a 0.4 kg box creep ~5 mm through a 37 N grip at friction 1
+  # (1.0 kg: > 6 mm, dropped by the 10 mm criterion); the elliptic cone with impratio 10 (MuJoCo's
+  # recommendation for grasping) reduces the creep to < 1 mm. Sensitivity: docs/research/v0.6-results.md.
+  cone: elliptic
+  impratio: 10
+
+controller_model:
+  contacts: false             # controllers never see contact forces (payload stays unmodelled)
+  nominal_masses:
+    object: 0.4               # fixed; irrelevant without contacts, kept constant across mass conditions
+
+task:                         # unused by pick_place.py (main.py needs a task section)
+  type: joint_target
+  waypoints:
+    home: [0.0, 0.0, 0.0, -1.57079, 0.0, 1.57079, -0.7853]
+    home2: [0.0, 0.0, 0.0, -1.57079, 0.0, 1.57079, -0.7853]
+
+controller:
+  type: torque_ctc
+  ctc:
+    disturbance_observer:
+      enabled: true
+
+pick_place:
+  start: [0.0, 0.0, 0.0, -1.57079, 0.0, 1.57079, -0.7853]   # Menagerie home
+  table_height: 0.40
+  object:
+    body: object
+    geom: object_geom
+    half_size: [0.025, 0.025, 0.03]   # must match environments/pick_place*.xml
+    mass: 0.4
+  gripper: {open: 255, close: 0}
+  grasp:
+    yaw: 0.0                  # finger axis along world x (home orientation), top-down
+    height_above_center: 0.015  # end effector (between the fingertips) 15 mm above the object center
+    approach_height: 0.10     # pre-grasp 100 mm above the grasp, straight-line descent
+    lift_height: 0.10         # straight-line lift (and lower) of 100 mm
+    retreat_height: 0.10
+  place_clearance: 0.002      # object bottom released 2 mm above the table
+  timing:
+    line_time: 1.5            # requested s per straight-line motion (lengthened to the limits)
+    edge_time: 1.0            # requested s per planned-path edge (lengthened to the limits)
+  trajectory:                 # v0.4 limits, as configs/default.yaml
+    velocity_scale: 0.9
+    acceleration_scale: 0.5
+    jerk_scale: 0.05
+    torque_scale: 0.8
+  line_tolerance:
+    position: 0.001           # m: max end-effector deviation from the straight line along the reference
+    rotation_deg: 0.5
+  collision:                  # phase-dependent exceptions; every other pair keeps the 20 mm clearance
+    gripper_object_min: 0.005 # hand/fingers vs object while descending/retreating around it (no contact)
+    object_table_min: -0.002  # carried object vs table while lifting off / lowering onto it (support)
+  timeouts:                   # s
+    settle: 2.0               # arm at rest after the end of a motion
+    close: 2.0
+    release: 2.0
+    verify: 3.0
+  success:                    # declared before evaluation; see SuccessCriteria
+    lift_height: 0.05
+    hold_time: 1.0
+    hold_slip: 0.005
+    drop_slip: 0.010
+    place_tolerance: 0.010
+    tilt_tolerance_deg: 10.0
+    settle_speed: 0.005
+    settle_time: 0.2
+    width_tolerance: 0.004
+  clearance_every: 5          # physics steps between plant clearance measurements
+  planning:
+    clearance: 0.02
+    cartesian_step: 0.01
+    max_joint_step: 0.05
+    exact_box_box: true
+    joint_limit_margin: 0.05
+    rrt:
+      step_size: 0.3
+      max_time: 5.0
+      max_nodes: 20000
+      max_iterations: 20000
+      try_direct: true
+    shortcut:
+      enabled: true
+      iterations: 100
+    ik:
+      tolerance: 1.0e-4
+      random_seeds: 12
+      local_seeds: 8
+      time_split: true
+      max_candidates: 4
+
+# Development cases (used while building v0.6; the evaluation suite is in configs/pick_place_study.yaml).
+cases:
+  - {name: dev_free_1, object: [0.50, 0.20], place: [0.50, -0.20], mass: 0.4, seed: 0}
+  - {name: dev_free_2, object: [0.45, -0.15], place: [0.60, 0.10], mass: 0.4, seed: 1}
+  - {name: dev_free_3, object: [0.60, 0.00], place: [0.40, 0.25], mass: 0.4, seed: 2}
+  - {name: dev_obstacle_1, environment: pick_place_obstacle, object: [0.50, 0.20], place: [0.50, -0.20], mass: 0.4, seed: 0}
+  - {name: dev_obstacle_2, environment: pick_place_obstacle, object: [0.45, 0.15], place: [0.55, -0.15], mass: 0.4, seed: 1}

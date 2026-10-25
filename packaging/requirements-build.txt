@@ -1,0 +1,3 @@
+# Tools for building ArmStrong.exe (build-exe.ps1). Verified on Windows 11, Python 3.12.0 (2026-10-24).
+pyinstaller==6.22.3
+pyinstaller-hooks-contrib==2026.9

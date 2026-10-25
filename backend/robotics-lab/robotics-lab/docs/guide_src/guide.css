@@ -1,0 +1,135 @@
+/* Robotics Lab technical guide: print stylesheet (Chrome CSS paged media). */
+
+@page {
+  size: Letter;
+  margin: 20mm 19mm 19mm 19mm;
+  @top-left { content: "Robotics Lab \2014  Complete Technical Guide"; font: 8.5pt "Segoe UI", Arial, sans-serif; color: #7a8590; }
+  @top-right { content: "v0.5.2 \00B7  October 2026"; font: 8.5pt "Segoe UI", Arial, sans-serif; color: #7a8590; }
+  @bottom-center { content: counter(page); font: 9.5pt Georgia, serif; color: #333; }
+}
+@page :first { margin: 0; @top-left { content: none } @top-right { content: none } @bottom-center { content: none } }
+
+:root {
+  --ink: #1d2733; --muted: #5b6672; --accent: #1f5f8b; --accent2: #b35c00;
+  --rule: #c9d2db; --code-bg: #f4f6f8;
+  --verified: #e8f3ec; --verified-b: #3f8f5a;
+  --measured: #eaf1fa; --measured-b: #3a6ea8;
+  --derived: #f6f0fb; --derived-b: #7a4fa3;
+  --proposal: #fdf4e6; --proposal-b: #b87414;
+  --warn: #fdecec; --warn-b: #b23b3b;
+}
+
+html { font-size: 10.6pt; }
+body { font-variant-numeric: lining-nums; font-family: Georgia, "Times New Roman", serif; color: var(--ink); line-height: 1.42; margin: 0; }
+p { margin: 0 0 0.62em 0; text-align: justify; hyphens: auto; orphans: 3; widows: 3; }
+a { color: var(--accent); text-decoration: none; }
+strong { color: #111; }
+em { font-style: italic; }
+
+/* ---------- title page ---------- */
+.titlepage { height: 279mm; width: 216mm; box-sizing: border-box; padding: 38mm 24mm 22mm 24mm;
+  background: linear-gradient(160deg, #10324d 0%, #1f5f8b 55%, #2f7fb1 100%); color: #fff; position: relative;
+  break-after: page; }
+.titlepage .kicker { font: 600 11pt "Segoe UI", Arial, sans-serif; letter-spacing: 0.18em; text-transform: uppercase; opacity: 0.85; }
+.titlepage h1.big { font: 700 40pt Georgia, serif; margin: 10mm 0 2mm 0; border: none; padding: 0; color: #fff; break-before: auto; }
+.titlepage .sub { font: 400 20pt Georgia, serif; opacity: 0.95; margin-bottom: 14mm; }
+.titlepage .desc { font: 11.5pt/1.5 "Segoe UI", Arial, sans-serif; max-width: 140mm; opacity: 0.92; }
+.titlepage .meta { position: absolute; bottom: 22mm; left: 24mm; right: 24mm; font: 9.5pt/1.55 "Segoe UI", Arial, sans-serif; opacity: 0.85;
+  border-top: 1px solid rgba(255,255,255,0.35); padding-top: 5mm; }
+.titlepage svg { margin-top: 12mm; }
+
+/* ---------- headings ---------- */
+h1, h2, h3, h4 { font-family: "Segoe UI", Arial, sans-serif; color: var(--ink); break-after: avoid; }
+h1 { break-before: page; font-weight: 700; margin: 0 0 7mm 0; padding-bottom: 3mm; border-bottom: 2.5px solid var(--accent); }
+h1 .chapnum { display: block; font-size: 11pt; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: var(--accent); margin-bottom: 1.5mm; }
+h1 .chaptitle { display: block; font-size: 22pt; line-height: 1.15; }
+h2 { font-size: 14pt; margin: 6.5mm 0 2.5mm 0; color: #183a56; }
+h3 { font-size: 11.5pt; margin: 4.5mm 0 1.8mm 0; color: #24435e; }
+h4 { font-size: 10.6pt; margin: 3mm 0 1mm 0; }
+.secnum { color: var(--accent); margin-right: 0.35em; }
+h1.toc-title { font-size: 22pt; }
+.chapter-intro { font-size: 11pt; color: #34414e; font-style: italic; margin-bottom: 5mm; }
+
+/* ---------- part dividers ---------- */
+.part { break-before: page; break-after: page; height: 200mm; display: flex; flex-direction: column; justify-content: center;
+  font: 700 26pt "Segoe UI", Arial, sans-serif; color: #10324d; border-left: 6px solid var(--accent); padding-left: 10mm; }
+.part small { display: block; font: 400 12pt/1.5 Georgia, serif; color: var(--muted); margin-top: 6mm; max-width: 130mm; }
+
+/* ---------- table of contents ---------- */
+nav.toc { break-before: page; }
+nav.toc ul { list-style: none; margin: 0; padding: 0; }
+nav.toc li a { display: flex; align-items: baseline; color: var(--ink); }
+nav.toc li .t { flex: 1 1 auto; overflow: hidden; }
+nav.toc li .t::after { content: " . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . ."; color: #9aa5b1; white-space: nowrap; }
+nav.toc li .t { white-space: nowrap; }
+nav.toc li .p { flex: 0 0 auto; min-width: 9mm; text-align: right; padding-left: 2mm; }
+nav.toc li .n { flex: 0 0 auto; min-width: 11mm; color: var(--accent); }
+li.toc-part { margin: 3.2mm 0 1mm 0; font: 700 10.5pt "Segoe UI", Arial, sans-serif; color: #10324d; break-after: avoid; }
+li.toc-part .t::after { content: none; }
+li.toc-ch { margin-top: 1.4mm; font: 600 10pt "Segoe UI", Arial, sans-serif; }
+li.toc-ch .n { min-width: 11mm; }
+li.toc-sec { font-size: 9.2pt; padding-left: 11mm; line-height: 1.32; }
+li.toc-sec .n { min-width: 11mm; font-size: 8.8pt; }
+
+/* ---------- boxes (evidence labels) ---------- */
+.box { border-left: 4px solid; padding: 2.2mm 3.5mm 1.6mm 3.5mm; margin: 3mm 0 3.5mm 0; break-inside: avoid; border-radius: 0 3px 3px 0; font-size: 9.9pt; }
+.box > .lbl { display: block; font: 700 8.3pt "Segoe UI", Arial, sans-serif; letter-spacing: 0.09em; text-transform: uppercase; margin-bottom: 1mm; }
+.box p:last-child { margin-bottom: 0.3em; }
+.box ul { margin: 0.2em 0 0.4em 1.1em; padding: 0; }
+.verified { background: var(--verified); border-color: var(--verified-b); } .verified > .lbl { color: var(--verified-b); }
+.measured { background: var(--measured); border-color: var(--measured-b); } .measured > .lbl { color: var(--measured-b); }
+.derived { background: var(--derived); border-color: var(--derived-b); } .derived > .lbl { color: var(--derived-b); }
+.proposal { background: var(--proposal); border-color: var(--proposal-b); } .proposal > .lbl { color: var(--proposal-b); }
+.warning { background: var(--warn); border-color: var(--warn-b); } .warning > .lbl { color: var(--warn-b); }
+.intuition { background: #f3f5f7; border-color: #8795a1; } .intuition > .lbl { color: #56636f; }
+
+/* ---------- code, file references ---------- */
+code, .file { font-family: Consolas, "Cascadia Mono", "Courier New", monospace; font-size: 0.86em; }
+code { background: var(--code-bg); padding: 0.05em 0.25em; border-radius: 2px; }
+.file { color: #7a3e00; background: #fbf3ea; padding: 0.05em 0.25em; border-radius: 2px; white-space: nowrap; }
+pre { font-family: Consolas, "Cascadia Mono", "Courier New", monospace; font-size: 8.4pt; line-height: 1.35; background: var(--code-bg);
+  border: 1px solid #dde3e9; border-radius: 3px; padding: 2.4mm 3mm; margin: 2.5mm 0 3.5mm 0; white-space: pre-wrap; word-break: break-word;
+  break-inside: avoid; }
+pre .c { color: #6a7785; } pre .k { color: #1f5f8b; font-weight: bold; }
+pre.src::before { content: attr(data-src); display: block; font: 600 7.8pt "Segoe UI", Arial, sans-serif; color: #7a3e00; margin-bottom: 1mm; }
+
+/* ---------- lists ---------- */
+ul, ol { margin: 0.2em 0 0.7em 1.3em; padding: 0; }
+li { margin-bottom: 0.18em; }
+
+/* ---------- tables ---------- */
+table { border-collapse: collapse; width: 100%; margin: 2.5mm 0 4mm 0; font-size: 8.9pt; line-height: 1.3; break-inside: auto; }
+table.small { font-size: 8.2pt; }
+caption { caption-side: top; text-align: left; font: 600 9pt "Segoe UI", Arial, sans-serif; color: #24435e; margin-bottom: 1.4mm; }
+th { background: #e6edf3; font-family: "Segoe UI", Arial, sans-serif; font-weight: 600; text-align: left; border-bottom: 1.5px solid #8ea3b5; }
+th, td { padding: 1.1mm 1.6mm; vertical-align: top; border-bottom: 0.5px solid var(--rule); }
+tr { break-inside: avoid; }
+thead { display: table-header-group; }
+td.num, th.num { text-align: right; white-space: nowrap; }
+.fignum, .tabnum { color: var(--accent); font-weight: 700; }
+
+/* ---------- figures ---------- */
+figure { margin: 3.5mm 0 4.5mm 0; text-align: center; break-inside: avoid; }
+figure img, figure svg { max-width: 100%; height: auto; }
+figure img.w80 { width: 80%; } figure img.w70 { width: 70%; } figure img.w60 { width: 60%; } figure img.w90 { width: 90%; }
+figcaption { font-size: 9pt; color: #34414e; text-align: left; margin-top: 1.8mm; line-height: 1.35; }
+
+/* ---------- math ---------- */
+mjx-container[display="true"] { margin: 2.2mm 0 !important; overflow: visible !important; max-width: 100%; }
+mjx-container[display="true"] > svg { max-width: 100% !important; height: auto !important; }
+.eqsrc { display: block; text-align: right; font: 7.6pt "Segoe UI", Arial, sans-serif; color: #7a3e00; margin-top: -1.5mm; margin-bottom: 2mm; }
+
+/* ---------- misc ---------- */
+.lead { font-size: 11pt; }
+.small { font-size: 9pt; }
+.center { text-align: center; }
+.twocol { columns: 2; column-gap: 7mm; }
+.keep { break-inside: avoid; }
+.pagebreak { break-before: page; }
+hr { border: none; border-top: 1px solid var(--rule); margin: 4mm 0; }
+dl.gloss dt { font-family: "Segoe UI", Arial, sans-serif; font-weight: 700; color: #183a56; margin-top: 1.6mm; break-after: avoid; }
+dl.gloss dd { margin: 0.2mm 0 0 5mm; }
+.diagram text { font-family: "Segoe UI", Arial, sans-serif; }
+
+mjx-container svg g, mjx-container svg path, mjx-container svg use { stroke: none !important; }
+nav.toc li.toc-app a span.n { flex: 0 0 25mm; width: 25mm; }

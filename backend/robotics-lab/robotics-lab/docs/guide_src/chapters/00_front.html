@@ -1,0 +1,96 @@
+<section class="titlepage">
+  <div class="kicker">Textbook and technical reference</div>
+  <h1 class="big">Robotics Lab</h1>
+  <div class="sub">Complete Technical Guide</div>
+  <div class="desc">A Franka Emika Panda arm simulated in MuJoCo: kinematics, dynamics, feedback control,
+    torque-level model predictive control, sampling-based motion planning, collision checking with
+    clearance, trajectory generation, and the experiments that test them. Written for a reader
+    who knows calculus and basic mechanics and wants to reach a research-level understanding of
+    this specific code base.</div>
+  <svg width="420" height="150" viewBox="0 0 420 150" xmlns="http://www.w3.org/2000/svg">
+    <g fill="none" stroke="#ffffff" stroke-width="3" stroke-linecap="round" opacity="0.9">
+      <line x1="20" y1="140" x2="120" y2="140"/>
+      <rect x="55" y="118" width="30" height="22" fill="rgba(255,255,255,0.15)"/>
+      <polyline points="70,118 70,70 140,40 205,62 238,92"/>
+      <circle cx="70" cy="118" r="6" fill="#1f5f8b"/><circle cx="70" cy="70" r="6" fill="#1f5f8b"/>
+      <circle cx="140" cy="40" r="6" fill="#1f5f8b"/><circle cx="205" cy="62" r="6" fill="#1f5f8b"/>
+      <path d="M238,92 l10,-6 M238,92 l6,10"/>
+      <rect x="275" y="70" width="12" height="70" fill="rgba(255,255,255,0.25)"/>
+      <path d="M238,92 C260,20 320,10 360,90" stroke-dasharray="6 6" opacity="0.8"/>
+      <circle cx="360" cy="90" r="5" fill="#f5b041" stroke="#f5b041"/>
+    </g>
+    <text x="300" y="148" fill="#ffffff" font-family="Segoe UI, Arial" font-size="11" opacity="0.8">wall</text>
+  </svg>
+  <div class="meta">
+    Repository state documented: branch <code style="background:rgba(255,255,255,0.15);color:#fff">feature/v0.5.2-clearance-fix</code>,
+    commit 5dbeffd (v0.5.2), 19 October 2026.<br>
+    Software: Python 3.13, MuJoCo 3.16.0, NumPy 2.5.4, SciPy 1.18.1, OSQP 1.1.3, Windows 11.<br>
+    Every statement about the software is checked against the source code at that commit; numerical results are
+    quoted from the project's own research reports and data files, with their sources.
+  </div>
+</section>
+
+<section class="front">
+<h1 class="front-h" style="break-before: page;"><span class="chaptitle">How to read this guide</span></h1>
+
+<p class="lead">This guide has two jobs. It teaches the robotics, control and planning ideas that the
+project uses, starting from first-year engineering mathematics. It is also an accurate reference
+to the code itself: every class, equation and number is tied to a file in the repository so you can
+open it in VS Code and check.</p>
+
+<h3 style="margin-top:3mm">Who it is written for</h3>
+<p>You know calculus I–III, Newton's laws, moments and simple differential equations, and some
+Python or MATLAB. You do not need to know robotics, control theory, optimization or motion planning
+yet. Each chapter starts with intuition, explains why the idea matters, develops the mathematics at an
+accessible level, connects it to our code, gives an example from this project, and ends with its
+limitations. Later chapters (7, 8, 11, 20) go to the level of a graduate course or a research paper.</p>
+
+<h3>The four kinds of statements</h3>
+<p>Robotics write-ups often blur "the code does this", "an experiment showed this", "the math
+implies this" and "we could do this". This guide keeps them apart with coloured boxes:</p>
+<div class="box verified"><span class="lbl">Verified in source code</span>
+<p>A fact read directly from the repository at commit 5dbeffd. The file and function are named, for
+example <span class="file">controllers/torque_mpc.py</span> <code>TorqueMPCController._update</code>.</p></div>
+<div class="box measured"><span class="lbl">Reported experimental result</span>
+<p>A number measured by one of the project's experiments, quoted from its research report or CSV file
+(<span class="file">docs/research/…</span>). It holds for the stated conditions, sample size and machine.
+This guide did not re-run the large benchmarks; it quotes them.</p></div>
+<div class="box derived"><span class="lbl">Mathematical deduction</span>
+<p>A conclusion that follows from equations, together with the assumptions it needs. If an assumption
+fails, so does the conclusion.</p></div>
+<div class="box proposal"><span class="lbl">Proposal (not implemented)</span>
+<p>An idea for future work. Nothing in such a box exists in the code today.</p></div>
+<div class="box warning"><span class="lbl">Discrepancy or caution</span>
+<p>A place where documentation and implementation disagree, or where a common misunderstanding is
+likely. These are investigated, not hidden.</p></div>
+
+<h3>Conventions</h3>
+<ul>
+<li>Vectors are bold-free but clear from context: $q \in \mathbb{R}^7$ is the vector of the seven arm
+joint angles, $\dot q$ its time derivative (joint velocities), $\ddot q$ the accelerations.</li>
+<li>Units are SI: metres, radians, seconds, newtons, newton-metres (Nm). 1 mrad = 0.001 rad;
+1 µrad = 10<sup>−6</sup> rad. At the Panda's reach (~0.8 m), 1 mrad of joint error moves the hand by at most
+roughly 1 mm.</li>
+<li>File paths are relative to the repository root, e.g. <span class="file">planning/collision.py</span>.
+Line numbers refer to commit 5dbeffd and are given where practical (Appendix C).</li>
+<li>"The plant" means the simulated robot (the MuJoCo model that is stepped). "The model" in a
+controller means the controller's own copy of the dynamics, which can deliberately differ from
+the plant in mismatch experiments.</li>
+</ul>
+
+<h3>Map of the guide</h3>
+<p><strong>Part I</strong> (Chapters 1–3) explains what the project is, tours the repository, and traces one
+run of <code>main.py</code> from start to finish. <strong>Part II</strong> (4–6) is the mechanics:
+kinematics, dynamics, MuJoCo and feedback control. <strong>Part III</strong> (7–9) is model predictive control,
+first from first principles with a small worked example, then our exact implementation, then its
+experiments. <strong>Part IV</strong> (10–12) covers motion planning, collision checking (including the
+v0.5.1 box-box bug and its v0.5.2 fix) and trajectory generation. <strong>Part V</strong> (13–16) analyses
+the architecture, the development history, every experiment and the test suite. <strong>Part VI</strong>
+(17–20) assesses what the robot can do today and how perception, reactive planning and manipulation
+could be added. Appendices A–E are a glossary, a mathematical reference, a source-code index, run
+instructions and answers to common questions.</p>
+
+<p>If you only have one evening, read Chapter 1, Chapter 3, Chapter 7 and Chapter 17.</p>
+</section>
+
+<!--TOC-->

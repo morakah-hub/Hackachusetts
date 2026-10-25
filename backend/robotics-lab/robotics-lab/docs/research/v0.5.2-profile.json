@@ -1,0 +1,880 @@
+{
+  "mujoco": "3.16.0",
+  "clearance": 0.02,
+  "workloads": {
+    "wall planner workload": {
+      "configs": 44616,
+      "invalid_by_truth": 925,
+      "box_box_pairs": 10,
+      "v05_false_safe": 0,
+      "v05_false_alarm": 91,
+      "v052_false_safe": 0,
+      "v052_false_alarm": 0,
+      "allpairs_equals_v052": true,
+      "geomdistance_calls_per_config_v052": 0.04155459924690694,
+      "geomdistance_calls_per_config_allpairs": 58.756589564281875,
+      "us_v05": 33.366211673528476,
+      "us_v052": 58.22629998209906,
+      "us_allpairs": 99.079482696893,
+      "us_exhaustive": 206.196584185192,
+      "exhaustive_pairs": 156,
+      "us_mj_collision_only": 25.247265554734135
+    },
+    "planning_demo uniform random": {
+      "configs": 2000,
+      "invalid_by_truth": 305,
+      "box_box_pairs": 10,
+      "v05_false_safe": 0,
+      "v05_false_alarm": 0,
+      "v052_false_safe": 0,
+      "v052_false_alarm": 0,
+      "allpairs_equals_v052": true,
+      "geomdistance_calls_per_config_v052": 0.0,
+      "geomdistance_calls_per_config_allpairs": 50.85,
+      "us_v05": 25.058849991182797,
+      "us_v052": 36.847299998044036,
+      "us_allpairs": 83.5351499990793,
+      "us_exhaustive": 160.16090000630356,
+      "exhaustive_pairs": 156,
+      "us_mj_collision_only": 22.470249998150393
+    },
+    "obstacles uniform random": {
+      "configs": 2000,
+      "invalid_by_truth": 221,
+      "box_box_pairs": 10,
+      "v05_false_safe": 0,
+      "v05_false_alarm": 0,
+      "v052_false_safe": 0,
+      "v052_false_alarm": 0,
+      "allpairs_equals_v052": true,
+      "geomdistance_calls_per_config_v052": 0.0,
+      "geomdistance_calls_per_config_allpairs": 53.37,
+      "us_v05": 22.094799991464242,
+      "us_v052": 35.12129999580793,
+      "us_allpairs": 80.90055000502616,
+      "us_exhaustive": 238.83054999168962,
+      "exhaustive_pairs": 179,
+      "us_mj_collision_only": 19.788700010394678
+    },
+    "planning_narrow uniform random": {
+      "configs": 2000,
+      "invalid_by_truth": 1625,
+      "box_box_pairs": 10,
+      "v05_false_safe": 0,
+      "v05_false_alarm": 0,
+      "v052_false_safe": 0,
+      "v052_false_alarm": 0,
+      "allpairs_equals_v052": true,
+      "geomdistance_calls_per_config_v052": 0.0,
+      "geomdistance_calls_per_config_allpairs": 13.125,
+      "us_v05": 66.08180000330321,
+      "us_v052": 67.18675000593066,
+      "us_allpairs": 78.42890000029001,
+      "us_exhaustive": 199.82619999791496,
+      "exhaustive_pairs": 179,
+      "us_mj_collision_only": 51.88184999860823
+    }
+  },
+  "planning": [
+    {
+      "scenario": "wall",
+      "checker": "v0.5",
+      "seed": 0,
+      "success": true,
+      "time_s": 0.1829258999787271,
+      "config_checks": 3808,
+      "geomdistance_calls": 0,
+      "length_rad": 1.4093720681441604
+    },
+    {
+      "scenario": "wall",
+      "checker": "v0.5",
+      "seed": 1,
+      "success": true,
+      "time_s": 0.22121220000553876,
+      "config_checks": 5784,
+      "geomdistance_calls": 0,
+      "length_rad": 1.3599570592853862
+    },
+    {
+      "scenario": "wall",
+      "checker": "v0.5",
+      "seed": 2,
+      "success": true,
+      "time_s": 0.18069919999106787,
+      "config_checks": 5226,
+      "geomdistance_calls": 0,
+      "length_rad": 1.4670598593189808
+    },
+    {
+      "scenario": "wall",
+      "checker": "v0.5",
+      "seed": 3,
+      "success": true,
+      "time_s": 0.1207425000029616,
+      "config_checks": 2392,
+      "geomdistance_calls": 0,
+      "length_rad": 1.316302676845182
+    },
+    {
+      "scenario": "wall",
+      "checker": "v0.5",
+      "seed": 4,
+      "success": true,
+      "time_s": 0.18887320000794716,
+      "config_checks": 5513,
+      "geomdistance_calls": 0,
+      "length_rad": 1.533230048881999
+    },
+    {
+      "scenario": "wall",
+      "checker": "v0.5",
+      "seed": 5,
+      "success": true,
+      "time_s": 0.2258074999845121,
+      "config_checks": 4180,
+      "geomdistance_calls": 0,
+      "length_rad": 1.1786183149037912
+    },
+    {
+      "scenario": "wall",
+      "checker": "v0.5",
+      "seed": 6,
+      "success": true,
+      "time_s": 0.2789487000263762,
+      "config_checks": 5067,
+      "geomdistance_calls": 0,
+      "length_rad": 1.2925582894915217
+    },
+    {
+      "scenario": "wall",
+      "checker": "v0.5",
+      "seed": 7,
+      "success": true,
+      "time_s": 0.25916730001335964,
+      "config_checks": 5020,
+      "geomdistance_calls": 0,
+      "length_rad": 1.4252512129812074
+    },
+    {
+      "scenario": "wall",
+      "checker": "v0.5",
+      "seed": 8,
+      "success": true,
+      "time_s": 0.25070840000989847,
+      "config_checks": 2308,
+      "geomdistance_calls": 0,
+      "length_rad": 1.7074959443434066
+    },
+    {
+      "scenario": "wall",
+      "checker": "v0.5",
+      "seed": 9,
+      "success": true,
+      "time_s": 0.3053680000011809,
+      "config_checks": 5422,
+      "geomdistance_calls": 0,
+      "length_rad": 1.5665803047318798
+    },
+    {
+      "scenario": "wall",
+      "checker": "v0.5.2",
+      "seed": 0,
+      "success": true,
+      "time_s": 0.2710957000090275,
+      "config_checks": 3910,
+      "geomdistance_calls": 211,
+      "length_rad": 1.407834392405433
+    },
+    {
+      "scenario": "wall",
+      "checker": "v0.5.2",
+      "seed": 1,
+      "success": true,
+      "time_s": 0.37131630000658333,
+      "config_checks": 5922,
+      "geomdistance_calls": 191,
+      "length_rad": 1.3521327204730456
+    },
+    {
+      "scenario": "wall",
+      "checker": "v0.5.2",
+      "seed": 2,
+      "success": true,
+      "time_s": 0.2715384000039194,
+      "config_checks": 4243,
+      "geomdistance_calls": 219,
+      "length_rad": 1.4657915287349985
+    },
+    {
+      "scenario": "wall",
+      "checker": "v0.5.2",
+      "seed": 3,
+      "success": true,
+      "time_s": 0.16993050000746734,
+      "config_checks": 2501,
+      "geomdistance_calls": 116,
+      "length_rad": 1.3142859996287184
+    },
+    {
+      "scenario": "wall",
+      "checker": "v0.5.2",
+      "seed": 4,
+      "success": true,
+      "time_s": 0.34502470001461916,
+      "config_checks": 5481,
+      "geomdistance_calls": 125,
+      "length_rad": 1.5290986603297996
+    },
+    {
+      "scenario": "wall",
+      "checker": "v0.5.2",
+      "seed": 5,
+      "success": true,
+      "time_s": 0.25773370001115836,
+      "config_checks": 4320,
+      "geomdistance_calls": 203,
+      "length_rad": 1.1816867772918005
+    },
+    {
+      "scenario": "wall",
+      "checker": "v0.5.2",
+      "seed": 6,
+      "success": true,
+      "time_s": 0.34079519999795593,
+      "config_checks": 4951,
+      "geomdistance_calls": 244,
+      "length_rad": 1.235567853639707
+    },
+    {
+      "scenario": "wall",
+      "checker": "v0.5.2",
+      "seed": 7,
+      "success": true,
+      "time_s": 0.39161419999436475,
+      "config_checks": 5020,
+      "geomdistance_calls": 126,
+      "length_rad": 1.4252512129812074
+    },
+    {
+      "scenario": "wall",
+      "checker": "v0.5.2",
+      "seed": 8,
+      "success": true,
+      "time_s": 0.30629000000772066,
+      "config_checks": 2769,
+      "geomdistance_calls": 239,
+      "length_rad": 1.657780746108482
+    },
+    {
+      "scenario": "wall",
+      "checker": "v0.5.2",
+      "seed": 9,
+      "success": true,
+      "time_s": 0.41517880000174046,
+      "config_checks": 5499,
+      "geomdistance_calls": 180,
+      "length_rad": 1.5610817427562347
+    },
+    {
+      "scenario": "obstacles_blocked",
+      "checker": "v0.5",
+      "seed": 0,
+      "success": true,
+      "time_s": 0.1298936999810394,
+      "config_checks": 2797,
+      "geomdistance_calls": 0,
+      "length_rad": 0.8669015069815609
+    },
+    {
+      "scenario": "obstacles_blocked",
+      "checker": "v0.5",
+      "seed": 1,
+      "success": true,
+      "time_s": 0.12965270000859164,
+      "config_checks": 3944,
+      "geomdistance_calls": 0,
+      "length_rad": 1.6142273597459194
+    },
+    {
+      "scenario": "obstacles_blocked",
+      "checker": "v0.5",
+      "seed": 2,
+      "success": true,
+      "time_s": 0.14894559999811463,
+      "config_checks": 2995,
+      "geomdistance_calls": 0,
+      "length_rad": 1.253694028160136
+    },
+    {
+      "scenario": "obstacles_blocked",
+      "checker": "v0.5",
+      "seed": 3,
+      "success": true,
+      "time_s": 0.3081071999913547,
+      "config_checks": 2683,
+      "geomdistance_calls": 0,
+      "length_rad": 0.6978152690959102
+    },
+    {
+      "scenario": "obstacles_blocked",
+      "checker": "v0.5",
+      "seed": 4,
+      "success": true,
+      "time_s": 0.1788855000049807,
+      "config_checks": 3739,
+      "geomdistance_calls": 0,
+      "length_rad": 1.3279390652130802
+    },
+    {
+      "scenario": "obstacles_blocked",
+      "checker": "v0.5",
+      "seed": 5,
+      "success": true,
+      "time_s": 0.17711630000849254,
+      "config_checks": 2996,
+      "geomdistance_calls": 0,
+      "length_rad": 0.9094772630018761
+    },
+    {
+      "scenario": "obstacles_blocked",
+      "checker": "v0.5",
+      "seed": 6,
+      "success": true,
+      "time_s": 0.1744209999742452,
+      "config_checks": 2511,
+      "geomdistance_calls": 0,
+      "length_rad": 0.7597993906939431
+    },
+    {
+      "scenario": "obstacles_blocked",
+      "checker": "v0.5",
+      "seed": 7,
+      "success": true,
+      "time_s": 0.2013022000028286,
+      "config_checks": 5225,
+      "geomdistance_calls": 0,
+      "length_rad": 2.708025532354684
+    },
+    {
+      "scenario": "obstacles_blocked",
+      "checker": "v0.5",
+      "seed": 8,
+      "success": true,
+      "time_s": 0.1293082000047434,
+      "config_checks": 3212,
+      "geomdistance_calls": 0,
+      "length_rad": 1.1012127636146125
+    },
+    {
+      "scenario": "obstacles_blocked",
+      "checker": "v0.5",
+      "seed": 9,
+      "success": true,
+      "time_s": 0.15063139999983832,
+      "config_checks": 3467,
+      "geomdistance_calls": 0,
+      "length_rad": 0.7064530894461312
+    },
+    {
+      "scenario": "obstacles_blocked",
+      "checker": "v0.5.2",
+      "seed": 0,
+      "success": true,
+      "time_s": 0.17439140001079068,
+      "config_checks": 2871,
+      "geomdistance_calls": 437,
+      "length_rad": 0.8902049604299083
+    },
+    {
+      "scenario": "obstacles_blocked",
+      "checker": "v0.5.2",
+      "seed": 1,
+      "success": true,
+      "time_s": 0.19220649998169392,
+      "config_checks": 4072,
+      "geomdistance_calls": 636,
+      "length_rad": 1.6188803420381896
+    },
+    {
+      "scenario": "obstacles_blocked",
+      "checker": "v0.5.2",
+      "seed": 2,
+      "success": true,
+      "time_s": 0.1849623000016436,
+      "config_checks": 3011,
+      "geomdistance_calls": 195,
+      "length_rad": 1.2326139948943997
+    },
+    {
+      "scenario": "obstacles_blocked",
+      "checker": "v0.5.2",
+      "seed": 3,
+      "success": true,
+      "time_s": 0.21375250001437962,
+      "config_checks": 2996,
+      "geomdistance_calls": 1086,
+      "length_rad": 1.2799170069832482
+    },
+    {
+      "scenario": "obstacles_blocked",
+      "checker": "v0.5.2",
+      "seed": 4,
+      "success": true,
+      "time_s": 0.20661379999364726,
+      "config_checks": 3555,
+      "geomdistance_calls": 384,
+      "length_rad": 1.3429494136950768
+    },
+    {
+      "scenario": "obstacles_blocked",
+      "checker": "v0.5.2",
+      "seed": 5,
+      "success": true,
+      "time_s": 0.20493800000986084,
+      "config_checks": 3000,
+      "geomdistance_calls": 410,
+      "length_rad": 0.8994399134103275
+    },
+    {
+      "scenario": "obstacles_blocked",
+      "checker": "v0.5.2",
+      "seed": 6,
+      "success": true,
+      "time_s": 0.20409829998970963,
+      "config_checks": 2506,
+      "geomdistance_calls": 344,
+      "length_rad": 0.7597993906939431
+    },
+    {
+      "scenario": "obstacles_blocked",
+      "checker": "v0.5.2",
+      "seed": 7,
+      "success": true,
+      "time_s": 0.2758275000087451,
+      "config_checks": 5225,
+      "geomdistance_calls": 584,
+      "length_rad": 2.708025532354684
+    },
+    {
+      "scenario": "obstacles_blocked",
+      "checker": "v0.5.2",
+      "seed": 8,
+      "success": true,
+      "time_s": 0.1695142999815289,
+      "config_checks": 3169,
+      "geomdistance_calls": 297,
+      "length_rad": 1.1011403634772137
+    },
+    {
+      "scenario": "obstacles_blocked",
+      "checker": "v0.5.2",
+      "seed": 9,
+      "success": true,
+      "time_s": 0.19318540001404472,
+      "config_checks": 3476,
+      "geomdistance_calls": 424,
+      "length_rad": 0.7064530894461312
+    },
+    {
+      "scenario": "narrow_passage",
+      "checker": "v0.5",
+      "seed": 0,
+      "success": true,
+      "time_s": 0.8402008999837562,
+      "config_checks": 9851,
+      "geomdistance_calls": 0,
+      "length_rad": 8.398470514384037
+    },
+    {
+      "scenario": "narrow_passage",
+      "checker": "v0.5",
+      "seed": 1,
+      "success": true,
+      "time_s": 0.5203288999910001,
+      "config_checks": 7446,
+      "geomdistance_calls": 0,
+      "length_rad": 2.6718115526595483
+    },
+    {
+      "scenario": "narrow_passage",
+      "checker": "v0.5",
+      "seed": 2,
+      "success": true,
+      "time_s": 3.0474503000150435,
+      "config_checks": 93208,
+      "geomdistance_calls": 0,
+      "length_rad": 7.5943338625322125
+    },
+    {
+      "scenario": "narrow_passage",
+      "checker": "v0.5",
+      "seed": 3,
+      "success": true,
+      "time_s": 0.32256390000111423,
+      "config_checks": 8587,
+      "geomdistance_calls": 0,
+      "length_rad": 7.41666982970399
+    },
+    {
+      "scenario": "narrow_passage",
+      "checker": "v0.5",
+      "seed": 4,
+      "success": true,
+      "time_s": 0.5337633000162896,
+      "config_checks": 15979,
+      "geomdistance_calls": 0,
+      "length_rad": 7.465432240273786
+    },
+    {
+      "scenario": "narrow_passage",
+      "checker": "v0.5",
+      "seed": 5,
+      "success": true,
+      "time_s": 0.4502088000008371,
+      "config_checks": 9348,
+      "geomdistance_calls": 0,
+      "length_rad": 3.8091207064693924
+    },
+    {
+      "scenario": "narrow_passage",
+      "checker": "v0.5",
+      "seed": 6,
+      "success": true,
+      "time_s": 0.4853799999982584,
+      "config_checks": 13633,
+      "geomdistance_calls": 0,
+      "length_rad": 7.80146969055976
+    },
+    {
+      "scenario": "narrow_passage",
+      "checker": "v0.5",
+      "seed": 7,
+      "success": true,
+      "time_s": 0.5897049999912269,
+      "config_checks": 11594,
+      "geomdistance_calls": 0,
+      "length_rad": 5.57615954962877
+    },
+    {
+      "scenario": "narrow_passage",
+      "checker": "v0.5",
+      "seed": 8,
+      "success": true,
+      "time_s": 0.5817956999817397,
+      "config_checks": 14528,
+      "geomdistance_calls": 0,
+      "length_rad": 6.460366910520804
+    },
+    {
+      "scenario": "narrow_passage",
+      "checker": "v0.5",
+      "seed": 9,
+      "success": true,
+      "time_s": 0.33969449999858625,
+      "config_checks": 8440,
+      "geomdistance_calls": 0,
+      "length_rad": 4.367913713516028
+    },
+    {
+      "scenario": "narrow_passage",
+      "checker": "v0.5.2",
+      "seed": 0,
+      "success": true,
+      "time_s": 0.6819434000062756,
+      "config_checks": 9851,
+      "geomdistance_calls": 172,
+      "length_rad": 8.398470514384037
+    },
+    {
+      "scenario": "narrow_passage",
+      "checker": "v0.5.2",
+      "seed": 1,
+      "success": true,
+      "time_s": 0.43573810000088997,
+      "config_checks": 7464,
+      "geomdistance_calls": 64,
+      "length_rad": 2.6718115526595483
+    },
+    {
+      "scenario": "narrow_passage",
+      "checker": "v0.5.2",
+      "seed": 2,
+      "success": true,
+      "time_s": 3.248579300008714,
+      "config_checks": 72659,
+      "geomdistance_calls": 35,
+      "length_rad": 7.5943338625322125
+    },
+    {
+      "scenario": "narrow_passage",
+      "checker": "v0.5.2",
+      "seed": 3,
+      "success": true,
+      "time_s": 0.4335016999975778,
+      "config_checks": 8587,
+      "geomdistance_calls": 7,
+      "length_rad": 7.41666982970399
+    },
+    {
+      "scenario": "narrow_passage",
+      "checker": "v0.5.2",
+      "seed": 4,
+      "success": true,
+      "time_s": 0.8072390999877825,
+      "config_checks": 15979,
+      "geomdistance_calls": 126,
+      "length_rad": 7.465432240273786
+    },
+    {
+      "scenario": "narrow_passage",
+      "checker": "v0.5.2",
+      "seed": 5,
+      "success": true,
+      "time_s": 0.5921482999983709,
+      "config_checks": 9348,
+      "geomdistance_calls": 82,
+      "length_rad": 3.8091207064693924
+    },
+    {
+      "scenario": "narrow_passage",
+      "checker": "v0.5.2",
+      "seed": 6,
+      "success": true,
+      "time_s": 0.7078173000190873,
+      "config_checks": 13633,
+      "geomdistance_calls": 44,
+      "length_rad": 7.80146969055976
+    },
+    {
+      "scenario": "narrow_passage",
+      "checker": "v0.5.2",
+      "seed": 7,
+      "success": true,
+      "time_s": 0.6029554999840911,
+      "config_checks": 11594,
+      "geomdistance_calls": 35,
+      "length_rad": 5.57615954962877
+    },
+    {
+      "scenario": "narrow_passage",
+      "checker": "v0.5.2",
+      "seed": 8,
+      "success": true,
+      "time_s": 0.6917047000024468,
+      "config_checks": 14528,
+      "geomdistance_calls": 16,
+      "length_rad": 6.460366910520804
+    },
+    {
+      "scenario": "narrow_passage",
+      "checker": "v0.5.2",
+      "seed": 9,
+      "success": true,
+      "time_s": 0.49520510001457296,
+      "config_checks": 8440,
+      "geomdistance_calls": 2,
+      "length_rad": 4.367913713516028
+    },
+    {
+      "scenario": "multi_ik_near_obstacle",
+      "checker": "v0.5",
+      "seed": 0,
+      "success": true,
+      "time_s": 0.2512161000049673,
+      "config_checks": 9174,
+      "geomdistance_calls": 0,
+      "length_rad": 1.4263951349085353
+    },
+    {
+      "scenario": "multi_ik_near_obstacle",
+      "checker": "v0.5",
+      "seed": 1,
+      "success": true,
+      "time_s": 0.19222620001528412,
+      "config_checks": 7045,
+      "geomdistance_calls": 0,
+      "length_rad": 1.4734897567580039
+    },
+    {
+      "scenario": "multi_ik_near_obstacle",
+      "checker": "v0.5",
+      "seed": 2,
+      "success": true,
+      "time_s": 0.20950719999382272,
+      "config_checks": 4706,
+      "geomdistance_calls": 0,
+      "length_rad": 1.884548645302301
+    },
+    {
+      "scenario": "multi_ik_near_obstacle",
+      "checker": "v0.5",
+      "seed": 3,
+      "success": true,
+      "time_s": 0.23505149999982677,
+      "config_checks": 7866,
+      "geomdistance_calls": 0,
+      "length_rad": 1.7292722211475517
+    },
+    {
+      "scenario": "multi_ik_near_obstacle",
+      "checker": "v0.5",
+      "seed": 4,
+      "success": true,
+      "time_s": 0.1666137999854982,
+      "config_checks": 4089,
+      "geomdistance_calls": 0,
+      "length_rad": 1.635952941012185
+    },
+    {
+      "scenario": "multi_ik_near_obstacle",
+      "checker": "v0.5",
+      "seed": 5,
+      "success": true,
+      "time_s": 0.18013200000859797,
+      "config_checks": 5274,
+      "geomdistance_calls": 0,
+      "length_rad": 1.5753400400674562
+    },
+    {
+      "scenario": "multi_ik_near_obstacle",
+      "checker": "v0.5",
+      "seed": 6,
+      "success": true,
+      "time_s": 0.26350810000440106,
+      "config_checks": 9232,
+      "geomdistance_calls": 0,
+      "length_rad": 1.611741614418998
+    },
+    {
+      "scenario": "multi_ik_near_obstacle",
+      "checker": "v0.5",
+      "seed": 7,
+      "success": true,
+      "time_s": 0.18981569999596104,
+      "config_checks": 6451,
+      "geomdistance_calls": 0,
+      "length_rad": 1.3783698785510619
+    },
+    {
+      "scenario": "multi_ik_near_obstacle",
+      "checker": "v0.5",
+      "seed": 8,
+      "success": true,
+      "time_s": 0.1704336999973748,
+      "config_checks": 4569,
+      "geomdistance_calls": 0,
+      "length_rad": 2.1353215160389225
+    },
+    {
+      "scenario": "multi_ik_near_obstacle",
+      "checker": "v0.5",
+      "seed": 9,
+      "success": true,
+      "time_s": 0.17248509998898953,
+      "config_checks": 4438,
+      "geomdistance_calls": 0,
+      "length_rad": 1.7984314957756902
+    },
+    {
+      "scenario": "multi_ik_near_obstacle",
+      "checker": "v0.5.2",
+      "seed": 0,
+      "success": true,
+      "time_s": 0.3694938000116963,
+      "config_checks": 9347,
+      "geomdistance_calls": 218,
+      "length_rad": 1.4358809653899398
+    },
+    {
+      "scenario": "multi_ik_near_obstacle",
+      "checker": "v0.5.2",
+      "seed": 1,
+      "success": true,
+      "time_s": 0.33481879997998476,
+      "config_checks": 8578,
+      "geomdistance_calls": 388,
+      "length_rad": 1.4632216009759542
+    },
+    {
+      "scenario": "multi_ik_near_obstacle",
+      "checker": "v0.5.2",
+      "seed": 2,
+      "success": true,
+      "time_s": 0.2634628000087105,
+      "config_checks": 4707,
+      "geomdistance_calls": 40,
+      "length_rad": 1.884548645302301
+    },
+    {
+      "scenario": "multi_ik_near_obstacle",
+      "checker": "v0.5.2",
+      "seed": 3,
+      "success": true,
+      "time_s": 0.3506035000027623,
+      "config_checks": 7591,
+      "geomdistance_calls": 748,
+      "length_rad": 1.730159788637423
+    },
+    {
+      "scenario": "multi_ik_near_obstacle",
+      "checker": "v0.5.2",
+      "seed": 4,
+      "success": true,
+      "time_s": 0.2542181000171695,
+      "config_checks": 5015,
+      "geomdistance_calls": 688,
+      "length_rad": 1.6355612573543135
+    },
+    {
+      "scenario": "multi_ik_near_obstacle",
+      "checker": "v0.5.2",
+      "seed": 5,
+      "success": true,
+      "time_s": 0.2470593000180088,
+      "config_checks": 5129,
+      "geomdistance_calls": 344,
+      "length_rad": 1.5749904672282273
+    },
+    {
+      "scenario": "multi_ik_near_obstacle",
+      "checker": "v0.5.2",
+      "seed": 6,
+      "success": true,
+      "time_s": 0.3973054000234697,
+      "config_checks": 9553,
+      "geomdistance_calls": 457,
+      "length_rad": 1.6114548464988867
+    },
+    {
+      "scenario": "multi_ik_near_obstacle",
+      "checker": "v0.5.2",
+      "seed": 7,
+      "success": true,
+      "time_s": 0.27114469997468404,
+      "config_checks": 5831,
+      "geomdistance_calls": 279,
+      "length_rad": 1.3756690816888089
+    },
+    {
+      "scenario": "multi_ik_near_obstacle",
+      "checker": "v0.5.2",
+      "seed": 8,
+      "success": true,
+      "time_s": 0.23336209999979474,
+      "config_checks": 4569,
+      "geomdistance_calls": 40,
+      "length_rad": 2.1353215160389225
+    },
+    {
+      "scenario": "multi_ik_near_obstacle",
+      "checker": "v0.5.2",
+      "seed": 9,
+      "success": true,
+      "time_s": 0.23743440001271665,
+      "config_checks": 4667,
+      "geomdistance_calls": 672,
+      "length_rad": 1.796284142130478
+    }
+  ]
+}

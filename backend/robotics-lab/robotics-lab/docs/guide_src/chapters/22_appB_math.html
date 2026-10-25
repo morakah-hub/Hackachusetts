@@ -1,0 +1,55 @@
+<h1 class="appendix" id="app-math">Mathematical reference</h1>
+<p>The important equations of the guide, with symbols and units. "Code" names the implementing function.</p>
+
+<h2 id="s-b-sym">Symbols</h2>
+<table class="small" id="tab-symbols">
+<caption>Symbols and units.</caption>
+<thead><tr><th>Symbol</th><th>Meaning</th><th>Unit</th></tr></thead>
+<tbody>
+<tr><td>$q, \dot q, \ddot q$</td><td>joint angles, velocities, accelerations (7-vectors)</td><td>rad, rad/s, rad/s²</td></tr>
+<tr><td>$x = (q, \dot q)$</td><td>state</td><td>rad, rad/s</td></tr>
+<tr><td>$\tau$</td><td>joint torques</td><td>Nm</td></tr>
+<tr><td>$u$</td><td>actuator command (torque or servo setpoint)</td><td>Nm or rad</td></tr>
+<tr><td>$M(q)$</td><td>inertia matrix</td><td>kg·m²</td></tr>
+<tr><td>$C(q,\dot q)\dot q$, $g(q)$</td><td>Coriolis/centrifugal and gravity torques</td><td>Nm</td></tr>
+<tr><td>$J(q)$</td><td>end-effector position Jacobian (3×7)</td><td>m/rad</td></tr>
+<tr><td>$e = q_{\text{ref}} - q$</td><td>tracking error</td><td>rad</td></tr>
+<tr><td>$\omega_n, \zeta$</td><td>natural frequency, damping ratio</td><td>rad/s, —</td></tr>
+<tr><td>$T_s$, $\Delta t$</td><td>control period (20 ms), physics step (2 ms)</td><td>s</td></tr>
+<tr><td>$N$</td><td>prediction horizon (25)</td><td>steps</td></tr>
+<tr><td>$A, B, c$</td><td>discrete affine prediction model</td><td>—, rad/Nm…, rad</td></tr>
+<tr><td>$Q, w_e, w_r, \rho_1, \rho_2$</td><td>MPC weights</td><td>per unit²</td></tr>
+<tr><td>$\hat d$</td><td>disturbance-torque estimate</td><td>Nm</td></tr>
+<tr><td>$s(t)$</td><td>timing law, 0 → 1</td><td>—</td></tr>
+<tr><td>$c$, $\Delta_c$, $R_j$</td><td>clearance (0.02), Cartesian step (0.01), lever arm</td><td>m</td></tr>
+</tbody></table>
+
+<h2 id="s-b-eq">Equations</h2>
+<table class="small" id="tab-equations">
+<caption>Key equations.</caption>
+<thead><tr><th>Name</th><th>Equation</th><th>Code / chapter</th></tr></thead>
+<tbody>
+<tr><td>Rotation about $z$</td><td>$R_z(\theta) = \begin{bmatrix}\cos\theta & -\sin\theta & 0\\ \sin\theta & \cos\theta & 0\\ 0&0&1\end{bmatrix}$</td><td>Ch. 4</td></tr>
+<tr><td>Homogeneous transform</td><td>$T_{AC} = T_{AB}T_{BC}$, $T = \begin{bmatrix}R & p\\0 & 1\end{bmatrix}$</td><td>MuJoCo <code>mj_kinematics</code>; Ch. 4</td></tr>
+<tr><td>Velocity kinematics</td><td>$\dot x = J(q)\dot q$, $\tau = J^TF$</td><td><code>ArmKinematics.jacobian</code></td></tr>
+<tr><td>DLS IK step</td><td>$\delta q = J^T(JJ^T + \lambda^2I)^{-1}e + k_{\text{null}}(I - J^+J)(q_{\text{rest}} - q)$, $\lambda = 0.05$, $k_{\text{null}} = 0.1$</td><td><code>ArmKinematics.solve_ik</code></td></tr>
+<tr><td>Robot dynamics</td><td>$M(q)\ddot q + C(q,\dot q)\dot q + g(q) = \tau + J^TF_{\text{ext}}$</td><td>MuJoCo; Ch. 5</td></tr>
+<tr><td>Position servo</td><td>$\tau = \mathrm{clip}(k_p(u - q) - k_d\dot q)$, $k_d = 0.1k_p$</td><td>Menagerie actuators</td></tr>
+<tr><td>PID outer loop</td><td>$u = q_{\text{ref}} + k_pe + k_i\!\int e + k_d(\dot q_{\text{ref}} - \dot q) + 0.1\,\dot q_{\text{ref}}$</td><td><code>JointPIDController.compute</code></td></tr>
+<tr><td>Computed torque</td><td>$\tau = \mathrm{ID}(q,\dot q,\ddot q_{\text{ref}} + K_pe + K_d\dot e)$, $K_p = \omega_n^2$, $K_d = 2\zeta\omega_n$</td><td><code>ComputedTorqueController.compute</code></td></tr>
+<tr><td>Error dynamics</td><td>$\ddot e + K_d\dot e + K_pe = 0$; with integral: stable iff $k_i &lt; K_dK_p$</td><td>Ch. 6</td></tr>
+<tr><td>Disturbance observer</td><td>$d_{\text{raw}} = \mathrm{ID}(q_{k-1},\dot q_{k-1},(\dot q_k-\dot q_{k-1})/\Delta t) - \tau_{k-1}$; $\hat d \leftarrow \hat d + \frac{\Delta t}{T}(d_{\text{raw}} - \hat d)$</td><td><code>JointDisturbanceObserver.update</code></td></tr>
+<tr><td>Composed prediction</td><td>$A = A_1^n$, $B = \sum_{i=0}^{n-1}A_1^iB_1$, $c = f_n(x_0,u) - Ax_0 - Bu$</td><td><code>MuJoCoPredictionModel.linearize</code></td></tr>
+<tr><td>Offset-free model</td><td>$x_{k+1} = Ax_k + B(\tau_k + \hat d) + c$</td><td><code>TorqueMPCController._update</code></td></tr>
+<tr><td>Torque MPC cost</td><td>$\sum_{k} w_k\|x_k - r_k\|^2_Q + w_e\sum\|v_k - v_{\text{hold}}\|^2 + w_r\sum\|v_k - v_{k-1}\|^2 + \sum(\rho_2\|s_k\|^2 + \rho_1\mathbf 1^Ts_k)$</td><td><code>_build_structure</code>, <code>_update</code></td></tr>
+<tr><td>QP standard form</td><td>$\min \tfrac12 z^TPz + q^Tz$ s.t. $l \le \mathcal Az \le u$</td><td>OSQP</td></tr>
+<tr><td>Feedthrough</td><td>$\tau = \mathrm{clip}(\tau_{\text{MPC}} - (\hat d - \hat d_{\text{update}}))$</td><td><code>TorqueMPCController.compute</code></td></tr>
+<tr><td>Straight move</td><td>$q(t) = q_a + (q_b - q_a)s(t)$</td><td><code>SegmentPlan.evaluate</code></td></tr>
+<tr><td>Quintic</td><td>$s = 10\tau^3 - 15\tau^4 + 6\tau^5$; peaks 1.875, 5.7735, 60</td><td><code>quintic</code></td></tr>
+<tr><td>Minimum duration</td><td>$T = \max(1.875/v_s,\sqrt{5.7735/a_s},\sqrt[3]{60/j_s})$, $v_s = \min_j v_{\max,j}/|\Delta q_j|$</td><td><code>plan_segment</code></td></tr>
+<tr><td>Motion bound</td><td>$\|dp/ds\| \le \sum_j R_j|\Delta q_j|$</td><td><code>CollisionChecker.motion_bound</code></td></tr>
+<tr><td>Edge samples</td><td>$n = \lceil\max(\sum_jR_j|\Delta q_j|/\Delta_c,\ \max_j|\Delta q_j|/0.05)\rceil$</td><td><code>edge_samples</code></td></tr>
+<tr><td>Clearance certificate</td><td>samples ≥ $c$ ⇒ edge ≥ $c - \Delta_c/2$ (assumptions in Ch. 11)</td><td>Ch. 11</td></tr>
+<tr><td>Separating-plane bound</td><td>$\mathrm{dist}(A,B) \ge \min_{y\in B}n\cdot y - \max_{x\in A}n\cdot x$ for unit $n$</td><td><code>tools/audit_clearance.py</code></td></tr>
+<tr><td>Rule of three</td><td>0 failures in $n$ trials ⇒ $p \lesssim 3/n$ at 95% confidence</td><td>Ch. 15</td></tr>
+</tbody></table>

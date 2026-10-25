@@ -1,0 +1,137 @@
+# Controller benchmark (benchmark.py). Every controller runs every scenario
+# from the same initial state, environment and reference trajectory.
+# Controller settings start from configs/default.yaml and are overridden per
+# entry below.
+#
+# Actuator models differ between controller groups:
+#   position servos (Menagerie): pid, mpc, mpc_100hz
+#   torque motors (v0.3 variant): torque_ctc, torque_ctc_dob, torque_mpc_v03, torque_mpc
+# Compare within a group to judge the controller; across groups the actuator
+# interface changes too, so differences are not attributable to MPC alone.
+
+environment: table
+gripper: 255
+
+controllers:
+  pid:
+    type: joint_pid
+  mpc:                       # default MPC: 50 Hz, horizon 15, reference preview
+    type: joint_mpc
+  mpc_100hz:
+    type: joint_mpc
+    mpc: {control_rate_hz: 100, horizon: 15, solver: {max_iter: 250}}
+  # Torque actuation (v0.3): a different actuator model, so compare these with
+  # each other; comparisons against the servo controllers mix actuator and controller.
+  torque_ctc:                # v0.3 computed-torque baseline, 500 Hz (no observer, no integral)
+    type: torque_ctc
+    ctc: {integral_gain: 0.0, disturbance_observer: {enabled: false}}
+  torque_ctc_dob:            # v0.4 improved CTC: + joint disturbance observer (10 ms)
+    type: torque_ctc
+    ctc: {disturbance_observer: {enabled: true, time_constant: 0.01}}
+  torque_mpc_v03:            # v0.3 torque MPC exactly: 50 Hz, horizon 25, no tightening, no observer
+    type: torque_mpc
+    torque_mpc: {velocity_margin: 0.0, disturbance_observer: {enabled: false}}
+  torque_mpc:                # v0.4 torque MPC (configs/default.yaml): 0.5% velocity tightening + observer
+    type: torque_mpc
+
+# All waypoints are within the joint limits and collision-free at rest
+# (tests/test_mpc.py checks this); contacts along the paths are counted.
+#
+# The scenarios up to `push` are the v0.3 scenarios, unchanged (fixed-duration
+# min-jerk moves, no feasibility check: `fast` and `wrist` exceed the joint speed
+# limits by 1.43x). The `*_feasible*` scenarios (v0.4) use the same poses with
+# feasibility-checked timing (tasks/trajectory.py); every controller gets the same
+# reference, generated once per scenario from the limits below.
+scenarios:
+  demo:                      # the v0.1 demonstration: home -> left -> right -> home
+    move_time: 3.0
+    hold_time: 1.0
+    waypoints:
+      home:  [0.0, 0.0, 0.0, -1.57079, 0.0, 1.57079, -0.7853]
+      left:  [0.7, 0.2, 0.0, -2.0, 0.0, 2.2, 1.2]
+      right: [-0.7, 0.3, 0.0, -1.8, 0.0, 2.1, 0.4]
+
+  fast:                      # same poses, 1 s moves: the reference exceeds the joint speed limits
+    move_time: 1.0
+    hold_time: 1.0
+    waypoints:
+      home:  [0.0, 0.0, 0.0, -1.57079, 0.0, 1.57079, -0.7853]
+      left:  [0.7, 0.2, 0.0, -2.0, 0.0, 2.2, 1.2]
+      right: [-0.7, 0.3, 0.0, -1.8, 0.0, 2.1, 0.4]
+
+  wrist:                     # large moves on the 12 Nm wrist joints (5-7)
+    move_time: 2.0
+    hold_time: 1.0
+    waypoints:
+      home:    [0.0, 0.0, 0.0, -1.57079, 0.0, 1.57079, -0.7853]
+      wrist_a: [0.0, 0.0, 0.0, -1.57079, 1.5, 1.0, 2.0]
+      wrist_b: [0.0, 0.0, 0.0, -1.57079, -1.5, 2.6, -2.0]
+
+  near_limits:               # poses 0.08-0.10 rad from joint limits, long base swings
+    move_time: 5.0
+    hold_time: 1.0
+    waypoints:
+      home:    [0.0, 0.0, 0.0, -1.57079, 0.0, 1.57079, -0.7853]
+      limit_a: [2.8, -0.3, 0.0, -2.95, 0.0, 3.65, 2.8]
+      limit_b: [-2.8, 0.3, 0.0, -0.15, 0.0, 1.0, -2.8]
+
+  reach:                     # Cartesian targets resolved by IK (3 reachable, 1 out of reach)
+    move_time: 3.0
+    hold_time: 1.5
+    targets:
+      - {name: front, position: [0.50, 0.00, 0.70]}
+      - {name: left_low, position: [0.40, 0.35, 0.60]}
+      - {name: right_high, position: [0.45, -0.30, 0.85]}
+      - {name: out_of_reach, position: [1.30, 0.00, 0.60]}
+
+  demo_mismatch:             # demo motion, but model-based controllers use robot masses/inertias 15% too low
+    move_time: 3.0
+    hold_time: 1.0
+    controller_model: {mass_scale: 0.85}
+    waypoints:
+      home:  [0.0, 0.0, 0.0, -1.57079, 0.0, 1.57079, -0.7853]
+      left:  [0.7, 0.2, 0.0, -2.0, 0.0, 2.2, 1.2]
+      right: [-0.7, 0.3, 0.0, -1.8, 0.0, 2.1, 0.4]
+
+  push:                      # hold home while the hand is pushed sideways
+    move_time: 1.0
+    hold_time: 5.0
+    duration: 4.0
+    waypoints:
+      home:  [0.0, 0.0, 0.0, -1.57079, 0.0, 1.57079, -0.7853]
+      home2: [0.0, 0.0, 0.0, -1.57079, 0.0, 1.57079, -0.7853]
+    disturbance:
+      body: hand
+      force: [0.0, 30.0, 0.0]  # N, world frame
+      start: 1.0
+      end: 2.0
+
+  fast_feasible:             # `fast` poses, 1 s requested; moves lengthened to meet the limits
+    move_time: 1.0
+    hold_time: 1.0
+    trajectory: &feasible {profile: min_jerk, velocity_scale: 0.9, acceleration_scale: 0.5, jerk_scale: 0.05, torque_scale: 0.8}
+    waypoints:
+      home:  [0.0, 0.0, 0.0, -1.57079, 0.0, 1.57079, -0.7853]
+      left:  [0.7, 0.2, 0.0, -2.0, 0.0, 2.2, 1.2]
+      right: [-0.7, 0.3, 0.0, -1.8, 0.0, 2.1, 0.4]
+
+  wrist_feasible:            # `wrist` poses, min-jerk timing lengthened to meet the limits
+    move_time: 2.0
+    hold_time: 1.0
+    trajectory: *feasible
+    waypoints:
+      home:    [0.0, 0.0, 0.0, -1.57079, 0.0, 1.57079, -0.7853]
+      wrist_a: [0.0, 0.0, 0.0, -1.57079, 1.5, 1.0, 2.0]
+      wrist_b: [0.0, 0.0, 0.0, -1.57079, -1.5, 2.6, -2.0]
+
+  wrist_feasible_dsc:        # `wrist` poses, jerk-limited double-S: cruises at 0.9 v_max, keeps 2 s moves
+    move_time: 2.0
+    hold_time: 1.0
+    trajectory: {profile: double_s, velocity_scale: 0.9, acceleration_scale: 0.5, jerk_scale: 0.05, torque_scale: 0.8}
+    waypoints:
+      home:    [0.0, 0.0, 0.0, -1.57079, 0.0, 1.57079, -0.7853]
+      wrist_a: [0.0, 0.0, 0.0, -1.57079, 1.5, 1.0, 2.0]
+      wrist_b: [0.0, 0.0, 0.0, -1.57079, -1.5, 2.6, -2.0]
+
+metrics:
+  settle_tolerance: 0.002    # rad, max joint error to count as settled

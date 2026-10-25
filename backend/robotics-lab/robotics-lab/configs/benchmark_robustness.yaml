@@ -1,0 +1,82 @@
+# v0.4 robustness benchmark: model mismatch, external forces and sensor noise
+# for the torque-level controllers (all on the same torque-motor Panda).
+#
+#   .\.venv\Scripts\python.exe benchmark.py --config configs\benchmark_robustness.yaml --output results\v0.4_robustness
+#
+# The plant (simulated robot) is always the nominal Menagerie Panda. In the
+# mass_* scenarios the model-based controllers get a copy of the model with every
+# robot body's mass and inertia scaled (controller_model.mass_scale): 0.75 means
+# the controller believes the arm is 25% lighter than it is. Observers and
+# predictions only ever use that copy and measured joint states; they never read
+# the plant's parameters or the applied external forces.
+
+environment: table
+gripper: 255
+
+controllers:
+  torque_ctc:                # v0.3 baseline
+    type: torque_ctc
+    ctc: {integral_gain: 0.0, disturbance_observer: {enabled: false}}
+  torque_ctc_i:              # + integral action (ki = 3000 < Kd Kp = 31250), conditional-integration anti-windup
+    type: torque_ctc
+    ctc: {integral_gain: 3000.0, integral_limit: 0.1, disturbance_observer: {enabled: false}}
+  torque_ctc_dob:            # + disturbance observer (10 ms)
+    type: torque_ctc
+    ctc: {disturbance_observer: {enabled: true, time_constant: 0.01}}
+  torque_mpc_v03:            # v0.3 torque MPC
+    type: torque_mpc
+    torque_mpc: {velocity_margin: 0.0, disturbance_observer: {enabled: false}}
+  torque_mpc:                # v0.4 torque MPC (default.yaml): offset-free with observer + feedthrough
+    type: torque_mpc
+
+# Shared motion: the demo poses with feasibility-checked timing (all moves stay 3 s).
+x-demo: &demo
+  move_time: 3.0
+  hold_time: 1.0
+  trajectory: {profile: min_jerk, velocity_scale: 0.9, acceleration_scale: 0.5, jerk_scale: 0.05, torque_scale: 0.8}
+  waypoints:
+    home:  [0.0, 0.0, 0.0, -1.57079, 0.0, 1.57079, -0.7853]
+    left:  [0.7, 0.2, 0.0, -2.0, 0.0, 2.2, 1.2]
+    right: [-0.7, 0.3, 0.0, -1.8, 0.0, 2.1, 0.4]
+
+x-hold: &hold                # hold the home pose (a 1 s "move" to the same pose, then hold)
+  move_time: 1.0
+  hold_time: 5.0
+  duration: 4.0
+  waypoints:
+    home:  [0.0, 0.0, 0.0, -1.57079, 0.0, 1.57079, -0.7853]
+    home2: [0.0, 0.0, 0.0, -1.57079, 0.0, 1.57079, -0.7853]
+
+scenarios:
+  nominal:     {<<: *demo}
+  mass_m25:    {<<: *demo, controller_model: {mass_scale: 0.75}}
+  mass_m15:    {<<: *demo, controller_model: {mass_scale: 0.85}}
+  mass_m10:    {<<: *demo, controller_model: {mass_scale: 0.90}}
+  mass_m05:    {<<: *demo, controller_model: {mass_scale: 0.95}}
+  mass_p05:    {<<: *demo, controller_model: {mass_scale: 1.05}}
+  mass_p10:    {<<: *demo, controller_model: {mass_scale: 1.10}}
+  mass_p15:    {<<: *demo, controller_model: {mass_scale: 1.15}}
+  mass_p25:    {<<: *demo, controller_model: {mass_scale: 1.25}}
+  push_py:     {<<: *hold, disturbance: {body: hand, force: [0.0, 30.0, 0.0], start: 1.0, end: 2.0}}
+  push_ny:     {<<: *hold, disturbance: {body: hand, force: [0.0, -30.0, 0.0], start: 1.0, end: 2.0}}
+  push_px:     {<<: *hold, disturbance: {body: hand, force: [30.0, 0.0, 0.0], start: 1.0, end: 2.0}}
+  push_nz:     {<<: *hold, disturbance: {body: hand, force: [0.0, 0.0, -30.0], start: 1.0, end: 2.0}}  # like a 3 kg load
+  push_link4:  {<<: *hold, disturbance: {body: link4, force: [0.0, 40.0, 0.0], start: 1.0, end: 2.0}}  # on the elbow
+  push_moving:               # +y push on the hand during the first demo move (changing reference)
+    <<: *demo
+    duration: 6.0
+    disturbance: {body: hand, force: [0.0, 30.0, 0.0], start: 1.0, end: 2.0}
+  push_mismatch:             # push while the controller model is also 15% too light
+    <<: *hold
+    controller_model: {mass_scale: 0.85}
+    disturbance: {body: hand, force: [0.0, 30.0, 0.0], start: 1.0, end: 2.0}
+  noise_demo:                # measurement noise on q (1e-4 rad) and qd (1e-3 rad/s) seen by the controllers
+    <<: *demo
+    sensor_noise: {position_std: 1.0e-4, velocity_std: 1.0e-3, seed: 1}
+  noise_push:
+    <<: *hold
+    sensor_noise: {position_std: 1.0e-4, velocity_std: 1.0e-3, seed: 1}
+    disturbance: {body: hand, force: [0.0, 30.0, 0.0], start: 1.0, end: 2.0}
+
+metrics:
+  settle_tolerance: 0.002

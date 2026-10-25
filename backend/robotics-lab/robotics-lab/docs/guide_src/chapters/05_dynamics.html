@@ -1,0 +1,150 @@
+<h1 class="chapter" id="ch-dyn">Robot dynamics and MuJoCo</h1>
+
+<p class="chapter-intro">Kinematics says where the robot is; dynamics says how torques make it move. This chapter derives the standard equation of motion of a robot arm and shows exactly how MuJoCo and our code represent each of its terms.</p>
+
+<h2 id="s-gen">Generalized coordinates, velocities and accelerations</h2>
+<p>A rigid-body system is described by the smallest set of numbers that fixes every body's pose: its
+<strong>generalized coordinates</strong>. For an arm with revolute joints these are simply the joint angles $q$. Their
+derivatives $\dot q$ (rad/s) and $\ddot q$ (rad/s²) are the generalized velocities and accelerations. The
+pair $x = (q, \dot q)$ is the <strong>state</strong>: knowing it, and the torques applied from now on, determines the
+future motion.</p>
+<div class="box verified"><span class="lbl">Verified in source code</span>
+<p>In MuJoCo the coordinates live in <code>data.qpos</code> (length <code>nq</code> = 9: seven arm joints, two finger
+slides) and the velocities in <code>data.qvel</code> (length <code>nv</code> = 9). For free bodies nq ≠ nv
+(quaternions), which is why the engine caches two different index arrays, <code>arm_qpos_adr</code> and
+<code>arm_dof_adr</code> (<span class="file">simulation/engine.py</span>, lines 84–89). The controllers' state is the
+14-vector $x = [q_{1..7}, \dot q_{1..7}]$ (<span class="file">controllers/prediction.py</span>).</p></div>
+
+<h2 id="s-pend">From one pendulum to the robot equation</h2>
+<p><strong>A single joint.</strong> Take one link of mass $m$ whose centre of mass is a distance $l$ from a horizontal joint
+axis, with moment of inertia $I$ about the axis. With $\theta$ measured from the downward vertical,
+Newton's law for rotation (sum of torques = inertia × angular acceleration) gives</p>
+\[ I\ddot\theta + m g l \sin\theta = \tau, \]
+<p>where $\tau$ is the motor torque and $mgl\sin\theta$ is gravity's torque. Holding the link still at angle
+$\theta$ requires $\tau = mgl\sin\theta$: the <strong>gravity compensation</strong> torque.</p>
+<p><strong>Many joints: the Lagrangian route.</strong> For a chain, writing Newton's law for every body and eliminating
+the joint reaction forces is tedious. Lagrange's method is systematic. Define the kinetic energy
+$T(q,\dot q) = \tfrac12 \dot q^T M(q)\dot q$ (the inertia "seen" by the joints depends on the posture) and
+the potential energy $V(q)$ (gravity). The Euler–Lagrange equations
+$\frac{d}{dt}\frac{\partial T}{\partial \dot q} - \frac{\partial T}{\partial q} + \frac{\partial V}{\partial q} = \tau$
+work out to</p>
+\[ \boxed{\; M(q)\,\ddot q + C(q,\dot q)\,\dot q + g(q) = \tau + \tau_{\text{ext}} \;} \]
+<p>with the following terms:</p>
+<ul>
+<li>$M(q)$, the 7×7 <strong>inertia (mass) matrix</strong>: symmetric and positive definite. Its diagonal entry $M_{jj}$ is the
+inertia joint $j$ feels; off-diagonal entries mean that accelerating one joint pushes on others.</li>
+<li>$C(q,\dot q)\dot q$, the <strong>Coriolis and centrifugal</strong> torques: the terms of
+$\dot M\dot q - \tfrac12 \partial(\dot q^T M \dot q)/\partial q$, quadratic in velocity. They are the
+"fictitious" forces of rotating frames; at the speeds in this project they are small compared with gravity
+and inertia.</li>
+<li>$g(q) = \partial V/\partial q$, the <strong>gravity</strong> torques.</li>
+<li>$\tau$, the actuator torques we command; $\tau_{\text{ext}} = J^T F$, joint torques produced by external forces
+$F$ (a push, a payload, contact).</li>
+</ul>
+<p>Two more terms appear in a real joint and in MuJoCo: <strong>joint damping</strong> $-b\dot q$ (viscous friction) and
+<strong>armature</strong> $I_a$ (the reflected inertia of the motor rotor and gearbox, added to the diagonal of $M$).</p>
+
+<h2 id="s-mjeq">How MuJoCo writes it</h2>
+<p>MuJoCo uses the same equation with its own names (MuJoCo documentation, "Computation"):</p>
+\[ M(q)\,\ddot q + c(q,\dot q) = \tau_{\text{act}} + \tau_{\text{passive}} + J_c^T f_c + \tau_{\text{applied}} \]
+<table id="tab-mjterms">
+<caption>The dynamics terms, their MuJoCo storage and where our code uses them.</caption>
+<thead><tr><th>Term</th><th>MuJoCo field</th><th>Used in our code</th></tr></thead>
+<tbody>
+<tr><td>inertia $M(q)$ incl. armature</td><td><code>data.M</code> (sparse), <code>mj_fullM</code></td><td>implicitly via <code>mj_inverse</code>, <code>mj_step</code></td></tr>
+<tr><td>bias $c = C\dot q + g$</td><td><code>data.qfrc_bias</code></td><td><code>MuJoCoPredictionModel.gravity_torque</code> reads it with $\dot q = 0$, giving $g(q)$</td></tr>
+<tr><td>actuator torque $\tau_{\text{act}}$</td><td><code>data.actuator_force</code>, <code>qfrc_actuator</code></td><td>commanded through <code>data.ctrl</code>; logged as <code>force</code></td></tr>
+<tr><td>passive: damping $-b\dot q$ (b = 1 Nm·s/rad)</td><td><code>qfrc_passive</code></td><td>part of the plant; in <code>mj_inverse</code></td></tr>
+<tr><td>contact forces $J_c^T f_c$</td><td><code>qfrc_constraint</code>, <code>data.contact</code></td><td>contacts counted by benchmarks; not modelled by controllers</td></tr>
+<tr><td>applied external force</td><td><code>xfrc_applied</code></td><td>push disturbances (<code>engine.apply_external_force</code>); hidden from controllers</td></tr>
+</tbody></table>
+
+<div class="box measured"><span class="lbl">Computed for this guide from the model</span>
+<p>At the home configuration the diagonal of the arm's inertia matrix is
+[1.51, 2.80, 1.47, 1.06, 0.144, 0.154, 0.107] kg·m² and its condition number is 33. The gravity torque is
+[0, −29.4, 0, 22.0, 0.67, 2.31, 0] Nm. At the wall demo's start configuration it is
+[0, −42.5, 4.26, 18.2, 0.64, 0.78, −0.01] Nm. Every joint has armature 0.1 kg·m² and damping 1 Nm·s/rad.
+For the wrist joints the armature is <em>most</em> of the inertia (joint 7: 0.107 total, 0.1 of it armature), which is
+why the small 12 Nm wrist motors can still accelerate the wrist quickly. Holding the demo start pose already
+needs 42.5 of joint 2's 87 Nm. Total arm mass: 17.45 kg. One <code>mj_step</code> took about 20 µs.</p></div>
+
+<h2 id="s-act">Actuators: position servos versus torque motors</h2>
+<p>An <strong>actuator</strong> maps a command to a joint torque. MuJoCo's general actuator computes
+$\tau = \text{gain}\cdot\text{ctrl} + \text{bias}(q,\dot q)$, then clips to the force range.</p>
+<ul>
+<li><strong>Position servo</strong> (Menagerie default): gain $k_p$, bias $-k_p q - k_d \dot q$, so
+$\tau = k_p(u - q) - k_d\dot q$, clipped. $k_p$ = 4500, 4500, 3500, 3500, 2000, 2000, 2000 Nm/rad and
+$k_d = 0.1\,k_p$ (<span class="file">panda.xml</span>, lines 265–274). The command $u$ is an angle (rad), not a torque.</li>
+<li><strong>Torque motor</strong> (our v0.3 variant): gain 1, no bias, so $\tau = u$ in Nm, clipped to ±87/±12 Nm
+(<code>Panda._make_torque_actuators</code>).</li>
+</ul>
+<p>The difference matters enormously for control. A servo is itself a stiff feedback loop running inside the
+physics at every step; a torque motor does exactly what it is told, so all feedback must come from our
+controller. Chapter 6 shows the consequences.</p>
+
+<h2 id="s-int">Numerical integration</h2>
+<p>The equation of motion gives $\ddot q$; the simulator must turn that into the next state. The simplest scheme,
+<em>explicit Euler</em>, is $\dot q_{k+1} = \dot q_k + h\ddot q_k$, $q_{k+1} = q_k + h\dot q_{k}$ with step $h$. It
+becomes unstable for stiff systems (large damping or stiffness relative to inertia) unless $h$ is tiny.
+<em>Semi-implicit Euler</em> updates velocity first and uses the new velocity for the position, which conserves
+energy much better. MuJoCo's <code>implicitfast</code> integrator goes further: it treats the velocity-dependent
+forces (damping, servo $k_d$) <em>implicitly</em>, solving
+$(M + hD)\,\dot q_{k+1} = M\dot q_k + h f(q_k, \dot q_k)$ where $D$ collects the derivative of the forces with
+respect to velocity. Heavily damped servos stay stable at $h$ = 2 ms.</p>
+<div class="box derived"><span class="lbl">Consequence used by the code</span>
+<p>Because damping acts implicitly, the discrete-time step is not exactly the continuous equation sampled at
+2 ms. Continuous-time inverse dynamics applied to measured finite-difference accelerations leaves a residual of
+about $h\,b\,\ddot q$ (≈ 0.02 Nm here) even with a perfect model. The disturbance observer therefore enables
+<code>mjENBL_INVDISCRETE</code>, MuJoCo's inverse dynamics of the <em>discrete</em> step, on a private model copy
+(<span class="file">controllers/disturbance.py</span>, line 54). Likewise, at the servo force-clip boundary the
+implicit update changes form (damping leaves it while the force is clipped), so the one-step map is
+discontinuous there; <span class="file">controllers/prediction.py</span> handles that with a force-unlimited backup
+model (Chapter 8).</p></div>
+
+<h2 id="s-contact">Contact forces and friction</h2>
+<p>When two geoms touch, a real contact produces normal force (no interpenetration) and friction (resisting
+sliding). MuJoCo models contacts as <em>soft constraints</em>: for every contact it computes a signed distance
+<code>dist</code> (negative = penetration) and solves a convex optimization for contact forces that allows a
+tiny, controlled penetration (parameters <code>solref</code>, <code>solimp</code>). Contacts are only generated when
+geoms are closer than their <strong>margin</strong> (0 by default); the planner's collision checker exploits this by
+setting a 20 mm margin on obstacles in its private model copy (Chapter 11). Collision detection proceeds in
+phases: a <em>broadphase</em> that discards pairs whose bounding boxes do not overlap, a <em>midphase</em> using
+bounding-volume trees within multi-geom bodies, and a <em>narrowphase</em> that computes the actual contact for
+each geom pair with a routine chosen by the pair's shape types (box-box, mesh-box via a general convex
+algorithm, and so on). Two of the project's most important findings concern these phases (midphase, v0.5;
+box-box narrowphase, v0.5.1/v0.5.2).</p>
+<p>In our experiments contact is never wanted: success requires <em>zero</em> robot contact steps. Contacts appear
+only in the deliberately unsafe baseline, where the arm drives into the wall (1,005–1,849 contact steps;
+Chapter 15).</p>
+
+<h2 id="s-mjrole">MuJoCo's role in the simulation</h2>
+<p>MuJoCo is used for much more than stepping the plant. <a class="ref" href="#tab-mjuse"></a> lists every way the
+project calls into it.</p>
+<table id="tab-mjuse">
+<caption>MuJoCo functions used by the project.</caption>
+<thead><tr><th>Function</th><th>What it computes</th><th>Where</th></tr></thead>
+<tbody>
+<tr><td><code>MjSpec</code>, <code>spec.compile()</code></td><td>edit and compile models in code</td><td><code>robots/panda.py</code>, <code>simulation/engine.py</code></td></tr>
+<tr><td><code>mj_step</code></td><td>advance the plant one 2 ms step</td><td><code>SimulationEngine.step</code>; prediction rollouts</td></tr>
+<tr><td><code>mj_forward</code>, <code>mj_kinematics</code></td><td>derived quantities; poses only</td><td>engine reset, FK, collision checker</td></tr>
+<tr><td><code>mj_jacSite</code></td><td>end-effector Jacobian</td><td><code>ArmKinematics.jacobian</code></td></tr>
+<tr><td><code>mj_inverse</code></td><td>torque for a given acceleration</td><td><code>ArmInverseDynamics.torque</code></td></tr>
+<tr><td><code>mjd_transitionFD</code></td><td>finite-difference Jacobians of one step</td><td><code>MuJoCoPredictionModel._jacobians_power</code></td></tr>
+<tr><td><code>mj_collision</code></td><td>contacts (with margins)</td><td><code>CollisionChecker._collide</code></td></tr>
+<tr><td><code>mj_geomDistance</code></td><td>exact distance between two geoms</td><td>checker (box-box pairs), <code>ExactClearance</code>, audit tool</td></tr>
+<tr><td><code>mj_getState</code>/<code>mj_setState</code></td><td>copy state into scratch data</td><td>prediction model, inverse dynamics</td></tr>
+<tr><td><code>viewer.launch_passive</code>, <code>Renderer</code></td><td>interactive viewer, offscreen images</td><td><code>run_viewer</code>, video tool, one test</td></tr>
+</tbody></table>
+<p>The simulation runs on the CPU. MuJoCo's classic C engine, which this project uses, does not use the GPU for
+physics; the GPU (via OpenGL) is used only for rendering in the viewer and the video tool.</p>
+
+<div class="box warning"><span class="lbl">Limitations of the dynamics as simulated</span>
+<ul>
+<li>The robot is the Menagerie model: convex-hull collision shapes, approximate inertias, no joint friction
+other than viscous damping, no motor dynamics, no gear backlash, no flexibility. Real Panda joints have
+friction and elasticity that are absent here.</li>
+<li>Model-based controllers use the <em>same</em> model as the plant unless a mismatch experiment scales the masses
+and inertias (<code>controller_model.mass_scale</code>); only uniform mass/inertia scaling has been tested.</li>
+<li>Sensors are perfect unless <code>sensor_noise</code> adds white Gaussian noise; there is no quantization, delay
+or filtering.</li>
+</ul></div>

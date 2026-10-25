@@ -1,0 +1,47 @@
+<!--
+  Table environment: ground plane, a fixed table, a robot mount site and a
+  visual-only target marker. The robot is attached at "robot_mount" in Python
+  (simulation/engine.py) so environments stay robot-agnostic.
+-->
+<mujoco model="table_env">
+  <option timestep="0.002" integrator="implicitfast"/>
+
+  <visual>
+    <headlight diffuse="0.6 0.6 0.6" ambient="0.3 0.3 0.3" specular="0 0 0"/>
+    <rgba haze="0.15 0.25 0.35 1"/>
+    <global azimuth="150" elevation="-25"/>
+  </visual>
+
+  <statistic center="0.3 0 0.6" extent="1.2"/>
+
+  <asset>
+    <texture type="skybox" builtin="gradient" rgb1="0.3 0.5 0.7" rgb2="0 0 0" width="512" height="3072"/>
+    <texture type="2d" name="groundplane" builtin="checker" mark="edge" rgb1="0.2 0.3 0.4" rgb2="0.1 0.2 0.3"
+      markrgb="0.8 0.8 0.8" width="300" height="300"/>
+    <material name="groundplane" texture="groundplane" texuniform="true" texrepeat="5 5" reflectance="0.2"/>
+    <material name="wood" rgba="0.55 0.38 0.22 1"/>
+    <material name="target" rgba="1 0.1 0.1 0.6"/>
+  </asset>
+
+  <worldbody>
+    <light pos="0 0 3" dir="0 0 -1" directional="true"/>
+    <light pos="1.5 -1.5 2.5" dir="-1 1 -1.2" diffuse="0.4 0.4 0.4"/>
+    <geom name="floor" type="plane" size="0 0 0.05" material="groundplane"/>
+
+    <!-- Table: top surface at z = 0.40 m, spans x in [-0.20, 0.90], y in [-0.50, 0.50]. -->
+    <body name="table" pos="0.35 0 0">
+      <geom name="table_top" type="box" size="0.55 0.5 0.02" pos="0 0 0.38" material="wood"/>
+      <geom name="table_leg1" type="box" size="0.025 0.025 0.18" pos=" 0.5  0.45 0.18" material="wood"/>
+      <geom name="table_leg2" type="box" size="0.025 0.025 0.18" pos=" 0.5 -0.45 0.18" material="wood"/>
+      <geom name="table_leg3" type="box" size="0.025 0.025 0.18" pos="-0.5  0.45 0.18" material="wood"/>
+      <geom name="table_leg4" type="box" size="0.025 0.025 0.18" pos="-0.5 -0.45 0.18" material="wood"/>
+    </body>
+
+    <site name="robot_mount" pos="0 0 0.40"/>
+
+    <!-- Visual-only target marker (mocap: moved kinematically, never collides). -->
+    <body name="target" mocap="true" pos="0.5 0 0.8">
+      <geom name="target_marker" type="sphere" size="0.03" material="target" contype="0" conaffinity="0"/>
+    </body>
+  </worldbody>
+</mujoco>

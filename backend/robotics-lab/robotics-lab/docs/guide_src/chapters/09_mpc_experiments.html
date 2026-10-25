@@ -1,0 +1,133 @@
+<h1 class="chapter" id="ch-mpc3">MPC experiments and limitations</h1>
+
+<p class="chapter-intro">How the controllers are evaluated, what the measurements say, and just as importantly what they do not say.</p>
+
+<h2 id="s-eval">How controller performance is evaluated</h2>
+<p>The controller benchmark (<code>benchmark.py</code> → <span class="file">simulation/benchmark.py</span>, scenarios in
+<span class="file">configs/benchmark.yaml</span>) runs every controller variant on every scenario from the same initial
+state, in the same environment (<code>table</code>), with the same physics (2 ms, implicitfast) and the same reference.
+Every metric is computed from the <em>simulated robot</em> at every physics step, never from the controllers' own
+predictions. End-effector errors use forward kinematics of the logged joints for both the actual and reference
+pose, because MuJoCo's <code>site_xpos</code> read after <code>mj_step</code> lags <code>qpos</code> by one step (CLAUDE.md).</p>
+<table id="tab-metrics">
+<caption>Main benchmark metrics (<code>run_case</code> in <span class="file">simulation/benchmark.py</span>).</caption>
+<thead><tr><th>Metric</th><th>Definition</th></tr></thead>
+<tbody>
+<tr><td><code>max_error_rad</code>, <code>rms_error_rad</code></td><td>max / RMS over time and joints of $|q - q_{\text{ref}}|$</td></tr>
+<tr><td><code>ee_max_error_mm</code></td><td>max $\|\mathrm{FK}(q) - \mathrm{FK}(q_{\text{ref}})\|$</td></tr>
+<tr><td><code>ee_orientation_*_deg</code></td><td>geodesic angle between actual and reference hand orientation (joint tasks)</td></tr>
+<tr><td><code>settling_time_*</code></td><td>time after a move until the error stays below 2 mrad</td></tr>
+<tr><td><code>velocity_limit_violation_steps</code>, <code>max_velocity_ratio</code></td><td>steps with any $|\dot q_j| > v_{\max,j}$; peak $|\dot q|/v_{\max}$</td></tr>
+<tr><td><code>torque_saturation_fraction</code></td><td>share of steps with an actuator at its force limit</td></tr>
+<tr><td><code>robot_contact_steps</code></td><td>steps with any robot contact</td></tr>
+<tr><td><code>reference_*_ratio</code>, <code>reference_feasible</code></td><td>is the reference itself within the limits?</td></tr>
+<tr><td><code>mpc_*</code>, <code>deadline_overruns</code></td><td>updates, fallbacks, solve/update times, overruns of the control period, predicted constraint use, slack</td></tr>
+</tbody></table>
+
+<h2 id="s-tracking">Tracking results on feasible references</h2>
+<div class="box measured"><span class="lbl">Reported results (v0.4 report §8, docs/research/v0.4-benchmark-results.csv)</span>
+<table class="small"><thead><tr><th>scenario (feasible)</th><th>CTC</th><th>CTC + observer</th><th>torque MPC v0.4</th><th>ratio CTC/MPC</th></tr></thead>
+<tbody>
+<tr><td>demo (3 s moves)</td><td class="num">0.063</td><td class="num">0.063</td><td class="num">0.0028</td><td class="num">22×</td></tr>
+<tr><td>near_limits</td><td class="num">0.093</td><td class="num">0.093</td><td class="num">0.0037</td><td class="num">25×</td></tr>
+<tr><td>reach (Cartesian)</td><td class="num">0.031</td><td class="num">0.031</td><td class="num">0.0022</td><td class="num">14×</td></tr>
+<tr><td>fast_feasible</td><td class="num">0.32</td><td class="num">0.32</td><td class="num">0.040</td><td class="num">8×</td></tr>
+<tr><td>wrist_feasible</td><td class="num">0.16</td><td class="num">0.16</td><td class="num">0.0053</td><td class="num">30×</td></tr>
+<tr><td>wrist_feasible_dsc (double-S)</td><td class="num">0.48</td><td class="num">0.48</td><td class="num">0.17</td><td class="num">2.8×</td></tr>
+</tbody></table>
+<p>Max joint error in mrad; exact controller model; no sensor noise. RMS torques of CTC and MPC agreed within 0.5% on
+motion scenarios (v0.3 report §8).</p></div>
+<p><strong>Why the MPC tracks more tightly with the same model and torque.</strong> CTC reacts to the error with fixed
+gains ($\omega_n$ = 25 rad/s) and feeds forward the reference acceleration. MPC sees the reference 0.5 s ahead and
+optimizes the whole torque sequence, so it starts acting before an error appears. Its advantage shrinks for the
+double-S profile, whose jerk is piecewise constant: the MPC cannot anticipate a jerk step within a 20 ms hold.</p>
+
+<h2 id="s-infeas">The fast and wrist investigation: infeasible references</h2>
+<p>In v0.3 the torque MPC looked dramatically worse than CTC on the <code>fast</code> and <code>wrist</code> scenarios
+(169 and 532 mrad vs 0.54 and 0.29 mrad). The v0.4 investigation (<code>tools/diagnose_torque_mpc.py</code>) found that
+these references are <strong>physically infeasible</strong>: they ask joint 7 for 3.72–3.75 rad/s, 1.43× its 2.61 rad/s limit.
+CTC simply follows them and breaks the speed limit by 43%. The MPC obeys the limit and must fall behind.</p>
+<div class="box derived"><span class="lbl">The lower bound (v0.4 report §2)</span>
+<p>For a quintic move the peak speed is $1.875|\Delta q|/T$. A follower limited to $v_{\max}$ must accumulate a lag of
+$L = \int(|\dot q_{\text{ref}}| - v_{\max})^+\,dt$ over the over-speed stretch: 294 mrad (fast) and 608 mrad (wrist). With perfect
+look-ahead it can run ahead by $L/2$ before and end up $L/2$ behind after, so <em>no speed-limited controller</em> can do
+better than ≈147 mrad (fast) or ≈304 mrad (wrist) maximum error. The MPC's 169 mrad is within 15% of the bound.
+Removing only the speed limit, it tracks to 0.10 / 0.04 mrad; on feasible timing to 0.02 / 0.01 mrad.</p></div>
+<figure id="fig-fastwrist"><img class="w90" src="../figures/repo_v04_fast_wrist.png" alt="fast wrist">
+<figcaption>Fast and wrist scenarios before and after v0.4 (from <span class="file">docs/research/figures/v0.4-fast-wrist.png</span>).</figcaption></figure>
+<p>The lesson generalizes: <strong>a controller that enforces limits will appear to "fail" on an infeasible reference</strong>.
+Feasibility belongs in trajectory generation, which v0.4 added (Chapter 12). The historical scenarios were kept
+unchanged so v0.3 numbers stay comparable.</p>
+
+<h2 id="s-robust">Model mismatch and disturbances</h2>
+<figure id="fig-mismatch"><img class="w80" src="../figures/repo_v04_mismatch_sweep.png" alt="mismatch sweep">
+<figcaption>Maximum error versus controller-model mass scale (plant always nominal), from
+<span class="file">docs/research/figures/v0.4-mismatch-sweep.png</span>.</figcaption></figure>
+<div class="box measured"><span class="lbl">Reported results (v0.4 report §5)</span>
+<table class="small"><thead><tr><th>controller mass / true</th><th>CTC</th><th>CTC + I</th><th>CTC + obs.</th><th>MPC v0.3</th><th>MPC v0.4</th></tr></thead>
+<tbody>
+<tr><td>0.75</td><td class="num">9.09</td><td class="num">7.12</td><td class="num">0.84</td><td class="num">3.44</td><td class="num">0.95</td></tr>
+<tr><td>0.85</td><td class="num">4.98</td><td class="num">3.85</td><td class="num">0.46</td><td class="num">1.91</td><td class="num">0.53</td></tr>
+<tr><td>1.00</td><td class="num">0.063</td><td class="num">0.031</td><td class="num">0.063</td><td class="num">0.0028</td><td class="num">0.0028</td></tr>
+<tr><td>1.25</td><td class="num">6.20</td><td class="num">4.61</td><td class="num">0.54</td><td class="num">2.61</td><td class="num">0.69</td></tr>
+<tr><td>30 N push on hand (+y)</td><td class="num">35.2</td><td class="num">26.8</td><td class="num">3.14</td><td class="num">12.1</td><td class="num">3.62</td></tr>
+<tr><td>30 N −z (≈ 3 kg load)</td><td class="num">20.0</td><td class="num">15.4</td><td class="num">1.81</td><td class="num">8.14</td><td class="num">2.24</td></tr>
+</tbody></table>
+<p>Max joint error, mrad. With sensor noise (1e-4 rad, 1e-3 rad/s) the MPC was more noise-sensitive than CTC
+(0.29 vs 0.09 mrad max), because of its large position weight.</p></div>
+<p><strong>Interpretation.</strong> Every model-based controller degrades quickly with model error: a 15% mass error turns the
+MPC's 2.8 µrad into 1.9 mrad without the observer. The observer recovers most of it. CTC with the observer is
+slightly better than the offset-free MPC on every disturbance test, because it applies its correction every 2 ms
+with no QP in the loop. The MPC's advantages are nominal tracking and constraint enforcement, not disturbance
+rejection.</p>
+
+<h2 id="s-timing">Solver runtimes and deadlines</h2>
+<div class="box measured"><span class="lbl">Reported results (v0.4 report §7, tools/profile_mpc.py, quietest of four runs)</span>
+<table class="small"><thead><tr><th>variant</th><th>mean</th><th>p95</th><th>p99</th><th>misses</th><th>linearize</th><th>OSQP update</th><th>OSQP solve</th></tr></thead>
+<tbody>
+<tr><td>torque MPC 50 Hz, N = 25</td><td class="num">4.96</td><td class="num">7.36</td><td class="num">10.06</td><td class="num">0/300</td><td class="num">0.57</td><td class="num">1.08</td><td class="num">2.80</td></tr>
+<tr><td>torque MPC 100 Hz, N = 25</td><td class="num">9.56</td><td class="num">14.19</td><td class="num">19.47</td><td class="num">215/600</td><td class="num">1.01</td><td class="num">1.90</td><td class="num">5.47</td></tr>
+<tr><td>torque MPC 100 Hz, N = 50</td><td class="num">18.76</td><td class="num">26.33</td><td class="num">49.15</td><td class="num">600/600</td><td class="num">1.16</td><td class="num">3.89</td><td class="num">11.66</td></tr>
+<tr><td>servo MPC 50 Hz, N = 15</td><td class="num">3.35</td><td class="num">3.81</td><td class="num">4.67</td><td class="num">0/300</td><td class="num">0.55</td><td class="num">0.75</td><td class="num">1.56</td></tr>
+</tbody></table>
+<p>Milliseconds per update. Wall-clock time on this laptop varied 2–3× between runs; across all runs the 50 Hz torque
+MPC averaged 4.96–14.1 ms and missed 0–22 of 300 deadlines.</p></div>
+<p>The OSQP solve plus loading new data into OSQP take about 77% of an update; the A matrix changes every update, so
+the KKT factorization is redone each time. 50 Hz with a 0.5 s horizon fits the 20 ms budget on a quiet machine;
+100 Hz with an equivalent horizon does not fit in this Python/OSQP implementation.</p>
+
+<h2 id="s-demonstrate">What the results demonstrate, and what they do not</h2>
+<table id="tab-demonstrate">
+<caption>Scope of the MPC evidence.</caption>
+<thead><tr><th>Demonstrated (in simulation, with the stated conditions)</th><th>Not demonstrated</th></tr></thead>
+<tbody>
+<tr><td>Torque MPC tracks feasible references 3–30× more tightly than CTC with the same model and similar torque.</td><td>Any of this on a real robot, with real friction, sensor noise, delay and unmodelled dynamics.</td></tr>
+<tr><td>It enforces torque limits exactly and speed limits to within 0.5% (after tightening), even on infeasible references.</td><td>Robustness guarantees: soft constraints and an LTI model give no certificate.</td></tr>
+<tr><td>With the observer it is offset-free under pushes and ±25% uniform mass errors, without instability.</td><td>Robustness to friction, centre-of-mass, damping or armature errors (never varied).</td></tr>
+<tr><td>50 Hz updates fit the 20 ms budget on a quiet desktop CPU.</td><td>Hard real-time execution; behaviour under computation delay.</td></tr>
+<tr><td>Results are deterministic and reproducible (fixed initial state, seeded noise).</td><td>Statistical generality: each scenario is one deterministic trajectory.</td></tr>
+</tbody></table>
+
+<h2 id="s-closed">Is it really closed loop?</h2>
+<p>Yes. Every update starts from the measured state (<code>x0 = np.concatenate([q, qd])</code>), and the test
+<code>test_torque_mpc_state_feedback</code> checks that a perturbed state changes the command. Between updates the held
+torque is still corrected at 500 Hz by the observer feedthrough. What is <em>open-loop</em> is each individual plan over
+its 0.5 s horizon, as in every MPC.</p>
+
+<h2 id="s-noobst">Why closed-loop MPC does not give obstacle avoidance</h2>
+<p>A frequent misconception is that an MPC "plans" and should therefore avoid obstacles. Ours cannot, for three reasons:
+(1) it has no information about obstacles: its inputs are joint states and a joint reference; (2) its cost only
+measures distance from the reference, so any route that tracks well is "good"; (3) collision avoidance is a
+non-convex constraint (the robot must be outside every obstacle), which does not fit a convex QP without
+approximation, and the horizon of 0.5 s is far too short to discover a detour over a wall. In this project obstacle
+avoidance is the planner's job (Chapter 10); the MPC keeps the arm on the planned, collision-checked path. Chapter 19
+discusses how obstacle constraints could be added to an MPC in the future.</p>
+
+<h2 id="s-realtime">Is it real-time on our laptop?</h2>
+<p>In the sense that an average update (≈5 ms) is shorter than the control period (20 ms): yes, with margin on a
+quiet machine. In the strict sense of guaranteed deadlines: no. The code runs in Python on Windows, a non-real-time
+operating system; worst-case update times of 16.6 ms were observed in the traced run, and up to 22 of 300 deadlines
+were missed under load. In simulation a missed deadline has no physical effect (the simulated clock waits, Chapter 3),
+so tracking results are unaffected; on hardware it would mean a late command. How much faster than real time a
+headless torque-MPC run is was not reported for the current version; the v0.2 README reported a real-time factor of
+about 4.5× for the 50 Hz servo MPC and about 30× for PID, and the benchmark records <code>realtime_factor</code> per run.</p>

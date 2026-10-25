@@ -1,0 +1,214 @@
+{
+ "key": "b9695814b1fc0ef34605",
+ "version": 1,
+ "measured_at": "2026-10-24T19:20:40+00:00",
+ "wall_s": 164.7,
+ "mujoco": "3.16.0",
+ "table_height": 0.75,
+ "table_radius": 0.805,
+ "zone": {
+  "r_in": 0.33,
+  "r_out": 0.745,
+  "theta_max_deg": 180.0
+ },
+ "profile": [
+  {
+   "theta_deg": -180.0,
+   "r_min": 0.275,
+   "r_max": 0.765
+  },
+  {
+   "theta_deg": -170.0,
+   "r_min": 0.275,
+   "r_max": 0.775
+  },
+  {
+   "theta_deg": -160.0,
+   "r_min": 0.27,
+   "r_max": 0.775
+  },
+  {
+   "theta_deg": -150.0,
+   "r_min": 0.27,
+   "r_max": 0.775
+  },
+  {
+   "theta_deg": -140.0,
+   "r_min": 0.27,
+   "r_max": 0.775
+  },
+  {
+   "theta_deg": -130.0,
+   "r_min": 0.27,
+   "r_max": 0.775
+  },
+  {
+   "theta_deg": -120.0,
+   "r_min": 0.27,
+   "r_max": 0.775
+  },
+  {
+   "theta_deg": -110.0,
+   "r_min": 0.285,
+   "r_max": 0.775
+  },
+  {
+   "theta_deg": -100.0,
+   "r_min": 0.29,
+   "r_max": 0.775
+  },
+  {
+   "theta_deg": -90.0,
+   "r_min": 0.29,
+   "r_max": 0.775
+  },
+  {
+   "theta_deg": -80.0,
+   "r_min": 0.3,
+   "r_max": 0.775
+  },
+  {
+   "theta_deg": -70.0,
+   "r_min": 0.3,
+   "r_max": 0.775
+  },
+  {
+   "theta_deg": -60.0,
+   "r_min": 0.305,
+   "r_max": 0.775
+  },
+  {
+   "theta_deg": -50.0,
+   "r_min": 0.305,
+   "r_max": 0.775
+  },
+  {
+   "theta_deg": -40.0,
+   "r_min": 0.305,
+   "r_max": 0.775
+  },
+  {
+   "theta_deg": -30.0,
+   "r_min": 0.305,
+   "r_max": 0.775
+  },
+  {
+   "theta_deg": -20.0,
+   "r_min": 0.305,
+   "r_max": 0.775
+  },
+  {
+   "theta_deg": -10.0,
+   "r_min": 0.31,
+   "r_max": 0.775
+  },
+  {
+   "theta_deg": 0.0,
+   "r_min": 0.305,
+   "r_max": 0.775
+  },
+  {
+   "theta_deg": 10.0,
+   "r_min": 0.305,
+   "r_max": 0.775
+  },
+  {
+   "theta_deg": 20.0,
+   "r_min": 0.305,
+   "r_max": 0.775
+  },
+  {
+   "theta_deg": 30.0,
+   "r_min": 0.305,
+   "r_max": 0.775
+  },
+  {
+   "theta_deg": 40.0,
+   "r_min": 0.305,
+   "r_max": 0.775
+  },
+  {
+   "theta_deg": 50.0,
+   "r_min": 0.305,
+   "r_max": 0.775
+  },
+  {
+   "theta_deg": 60.0,
+   "r_min": 0.3,
+   "r_max": 0.775
+  },
+  {
+   "theta_deg": 70.0,
+   "r_min": 0.295,
+   "r_max": 0.775
+  },
+  {
+   "theta_deg": 80.0,
+   "r_min": 0.295,
+   "r_max": 0.775
+  },
+  {
+   "theta_deg": 90.0,
+   "r_min": 0.29,
+   "r_max": 0.775
+  },
+  {
+   "theta_deg": 100.0,
+   "r_min": 0.29,
+   "r_max": 0.775
+  },
+  {
+   "theta_deg": 110.0,
+   "r_min": 0.29,
+   "r_max": 0.775
+  },
+  {
+   "theta_deg": 120.0,
+   "r_min": 0.285,
+   "r_max": 0.775
+  },
+  {
+   "theta_deg": 130.0,
+   "r_min": 0.285,
+   "r_max": 0.775
+  },
+  {
+   "theta_deg": 140.0,
+   "r_min": 0.28,
+   "r_max": 0.775
+  },
+  {
+   "theta_deg": 150.0,
+   "r_min": 0.28,
+   "r_max": 0.775
+  },
+  {
+   "theta_deg": 160.0,
+   "r_min": 0.28,
+   "r_max": 0.775
+  },
+  {
+   "theta_deg": 170.0,
+   "r_min": 0.28,
+   "r_max": 0.775
+  }
+ ],
+ "settings": {
+  "probe_heights_m": [
+   0.04,
+   0.12,
+   0.25
+  ],
+  "yaws_deg": [
+   0,
+   45,
+   90,
+   135
+  ],
+  "azimuth_step_deg": 10,
+  "radial_step_m": 0.01,
+  "margin_m": 0.02,
+  "min_ring_width_m": 0.3,
+  "table_rim_m": 0.06
+ }
+}

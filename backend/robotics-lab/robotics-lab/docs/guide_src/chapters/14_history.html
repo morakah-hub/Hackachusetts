@@ -1,0 +1,140 @@
+<h1 class="chapter" id="ch-hist">Project development history</h1>
+
+<p class="chapter-intro">The project's evolution reconstructed from the Git history (18 commits, 14–19 October 2026), the commit messages, the source at each milestone and the research reports. Where documentation is thin (v0.1, v0.2) only what the evidence supports is stated.</p>
+
+<h2 id="s-gitshape">The shape of the history</h2>
+<div class="box verified"><span class="lbl">Verified from Git</span>
+<p>The branch <code>master</code> still points to the v0.1 commit (26f46f9). Each later milestone was developed on its own branch,
+started from the previous milestone, and was never merged back:
+<code>feature/mpc-v0.2</code> → <code>feature/mpc-v0.3-robustness</code> → <code>feature/mpc-v0.4-reliability</code> →
+<code>feature/v0.5-motion-planning</code> → <code>feature/v0.5.1-robustness-demo</code> → <code>feature/v0.5.2-clearance-fix</code>. The
+newest branch therefore contains the whole history. Merging into <code>master</code> requires an explicit decision by the owner
+(<span class="file">CLAUDE.md</span>: "Do not commit or push without the user's explicit approval").</p></div>
+
+<figure id="fig-timeline">
+<svg class="diagram" width="640" height="150" viewBox="0 0 640 150" xmlns="http://www.w3.org/2000/svg">
+<g font-size="9.5">
+<line x1="20" y1="60" x2="620" y2="60" stroke="#1f5f8b" stroke-width="2"/>
+<g fill="#1f5f8b">
+<circle cx="30" cy="60" r="5"/><circle cx="95" cy="60" r="6"/><circle cx="190" cy="60" r="6"/><circle cx="290" cy="60" r="6"/>
+<circle cx="390" cy="60" r="6"/><circle cx="490" cy="60" r="6"/><circle cx="555" cy="60" r="6"/><circle cx="610" cy="60" r="6"/></g>
+<text x="18" y="45">init</text><text x="85" y="45" font-weight="700">v0.1</text><text x="180" y="45" font-weight="700">v0.2</text>
+<text x="280" y="45" font-weight="700">v0.3</text><text x="380" y="45" font-weight="700">v0.4</text><text x="480" y="45" font-weight="700">v0.5</text>
+<text x="540" y="45" font-weight="700">v0.5.1</text><text x="596" y="30" font-weight="700">v0.5.2</text>
+<text x="18" y="80" font-size="8.5">Oct 14</text><text x="85" y="80" font-size="8.5">Oct 14</text><text x="180" y="80" font-size="8.5">Oct 17</text>
+<text x="280" y="80" font-size="8.5">Oct 17</text><text x="380" y="80" font-size="8.5">Oct 18</text><text x="480" y="80" font-size="8.5">Oct 19</text>
+<text x="545" y="80" font-size="8.5">Oct 19</text><text x="600" y="80" font-size="8.5">Oct 19</text>
+<text x="70" y="100" font-size="8.5">PID, servos</text><text x="165" y="100" font-size="8.5">servo MPC</text>
+<text x="255" y="100" font-size="8.5">torque MPC, CTC, IK</text><text x="352" y="100" font-size="8.5">feasibility, observer</text>
+<text x="470" y="100" font-size="8.5">RRT-Connect</text><text x="520" y="115" font-size="8.5">wall variants, video</text><text x="560" y="130" font-size="8.5">box-box fix</text>
+<text x="70" y="140" font-size="8.5" fill="#5b6672">tests: 16 → 46 → 85 → 122 → 162 → 176 (1 xfail) → 189</text>
+</g></svg>
+<figcaption>Milestones, dates and the number of automated tests at each (from the READMEs and reports at each commit).</figcaption></figure>
+
+<h2 id="s-h-init">Initialization (184bfd6, 14 Oct)</h2>
+<p>A scaffold of 24 files, all empty except <code>.gitignore</code> and <code>requirements.txt</code>: the module layout
+(<code>controllers/</code>, <code>tasks/</code>, <code>simulation/</code>, <code>robots/</code>, <code>environments/</code>) was decided before any code was
+written, including <code>controllers/mpc.py</code>, <code>tasks/reach.py</code> and <code>tasks/pick_place.py</code> as placeholders. The first two
+were later filled; <code>pick_place.py</code> is still empty.</p>
+
+<h2 id="s-h-v01">v0.1 — first working Panda simulation (26f46f9, 14 Oct)</h2>
+<ul>
+<li><strong>Implemented.</strong> The Menagerie Panda vendored unmodified; scenes <code>table</code>, <code>empty</code>, <code>obstacles</code>; the engine
+(MjSpec attachment at <code>robot_mount</code>); the runner with viewer and headless modes; <code>JointTargetTask</code> with minimum-jerk
+moves through three waypoints in a loop; the <code>JointPIDController</code> outer loop on the position servos.</li>
+<li><strong>Problem solved.</strong> A physically simulated arm moving under closed-loop control, with motion only through actuators.</li>
+<li><strong>Experiments and tests.</strong> 16 tests (all still present in <span class="file">tests/test_simulation.py</span>), e.g. the arm falls under
+gravity without actuation, the integral removes gravity sag, the closed loop reaches all waypoints with small error.</li>
+<li><strong>Not documented.</strong> v0.1 has no research report; its performance figures appear only in CLAUDE.md (PID max tracking error
+&lt; 4 mrad, steady state ~0.1 mrad), which the later benchmark confirms (3.42 mrad on <code>demo</code>).</li>
+</ul>
+
+<h2 id="s-h-v02">v0.2 — experimental joint-space MPC on the servos (71d008c, 17 Oct)</h2>
+<ul>
+<li><strong>Implemented.</strong> <code>JointMPCController</code> optimizing servo setpoints with OSQP; <code>MuJoCoPredictionModel</code>
+(linearization from <code>mjd_transitionFD</code>); PID fallback; controller selection by config/CLI; the first benchmark
+(<code>benchmark.py</code>, <code>configs/benchmark.yaml</code>).</li>
+<li><strong>Results (README "Benchmark results (v0.2)").</strong> PID tracked moving references more tightly (demo 3.4 vs 7.8 mrad); the MPC
+saturated actuators on 21% of physics steps in <code>demo</code> because each setpoint step causes a ~1 ms clipped torque spike; in the
+<code>wrist</code> scenario 275 of 450 updates fell back to PID. MPC was better at rest, against the push (2.0 vs 3.4 mrad), and respected
+speed limits PID ignored. The commit message itself labels the controller "experimental".</li>
+<li><strong>Tests.</strong> 46 (per the v0.3 report).</li>
+</ul>
+
+<h2 id="s-h-v03">v0.3 — robustness, torque-level control, Cartesian reaching (646955d…b3bf48b, 17 Oct)</h2>
+<ul>
+<li><strong>Audit and the one MPC bug.</strong> Tools verified the QP objective term by term (6e-14). The audit found that after a fallback the
+servo MPC anchored to its stale solution instead of the command actually applied; fixing it reduced wrist fallbacks from 275 to
+43 of 450 and overruns from 236 to 31 (later 1).</li>
+<li><strong>Torque actuation.</strong> <code>Panda(actuation="torque")</code> in code via MjSpec; <code>ComputedTorqueController</code>;
+<code>TorqueMPCController</code> with normalized torques (fixing a 10-orders-of-magnitude conditioning problem) and an exact-penalty
+weight raised from 1e5 to 1e6 after a 2.5 rad step was planned at 3.8× v_max.</li>
+<li><strong>Cartesian reaching.</strong> <code>ArmKinematics</code> (DLS IK), <code>CartesianReachTask</code>, IK plus straight-path collision checking
+(targets are rejected, not avoided).</li>
+<li><strong>Benchmark.</strong> Torque MPC 2.8 µrad vs CTC 63 µrad on <code>demo</code>; under a 30 N push, torque controllers deflected
+12–35 mrad (no integral action); with 15% mass error MPC degraded to 1.9 mrad; on <code>fast</code>/<code>wrist</code> the torque MPC had
+169/532 mrad error (explained in v0.4). Speed-ups: forward-difference Jacobians and fixed CSC slots.</li>
+<li><strong>Tests.</strong> 85. <strong>Report:</strong> <span class="file">docs/research/v0.3-results.md</span>.</li>
+</ul>
+
+<h2 id="s-h-v04">v0.4 — reliability, feasibility, disturbance rejection (11608c6…b807baa, 18 Oct)</h2>
+<ul>
+<li><strong>Root cause of fast/wrist.</strong> The references were infeasible (1.43× the joint-7 speed limit); a lower bound showed no
+speed-limited controller can beat 147/304 mrad. Classified as "not a controller bug".</li>
+<li><strong>Trajectory generation.</strong> <code>tasks/trajectory.py</code>: time-scaled quintic and double-S, torque feasibility,
+<code>TrajectoryInfeasible</code>; new <code>*_feasible</code> scenarios while keeping the historical ones.</li>
+<li><strong>Constraints.</strong> Separate reporting of planned versus actual violations; a 0.5% velocity margin removed all 369/578 tiny
+over-speed steps of the torque MPC. The servo MPC's intersample violations could not be fixed this way.</li>
+<li><strong>Disturbance observer.</strong> Offset-free torque MPC with 500 Hz feedthrough; push error 12.1 → 3.6 mrad (MPC), 35.2 → 3.1 mrad
+(CTC + observer); mass errors ±25% handled without instability. Integral action for CTC evaluated and rejected as the main remedy.</li>
+<li><strong>Orientation metrics</strong>, sensor-noise option, timing profile (50 Hz fits, 100 Hz does not).</li>
+<li><strong>Not fixed.</strong> The servo MPC still saturates the wrist servos (135 mrad on feasible wrist motion vs 3.4 for PID).</li>
+<li><strong>Tests.</strong> 122. <strong>Report:</strong> <span class="file">v0.4-results.md</span>.</li>
+</ul>
+
+<h2 id="s-h-v05">v0.5 — collision-aware motion planning (e117058…ce3e907, 19 Oct)</h2>
+<ul>
+<li><strong>Implemented.</strong> <code>planning/</code>: <code>CollisionChecker</code> with 20 mm clearance via margins and lever-arm edge sampling;
+<code>RRTConnect</code>; shortcutting; multiple IK postures; <code>MotionPlanner</code>; <code>PlannedJointTask</code>; scenes <code>planning_demo</code> and
+<code>planning_narrow</code>; the planning benchmark.</li>
+<li><strong>Three defects found by measurement.</strong> MuJoCo's midphase dropped ~20% of near misses inside a margin (disabled in the checker);
+two shortcutting bugs made "optimized" paths longer; IK posture selection, not RRT, caused 8/20 failures in the narrow passage
+(fixed with local IK seeds).</li>
+<li><strong>Results.</strong> Wall, obstacle-block and narrow-passage scenes planned 20/20; all 24 planned executions succeeded with 0 contacts;
+all 8 unchecked direct executions collided.</li>
+<li><strong>Architecture.</strong> Planning happens once at task construction; controllers unchanged.</li>
+<li><strong>Tests.</strong> 162. <strong>Report:</strong> <span class="file">v0.5-results.md</span>.</li>
+</ul>
+
+<h2 id="s-h-v051">v0.5.1 — demo video and wall-geometry replanning (8309559, 2197959, 19 Oct)</h2>
+<ul>
+<li><strong>Implemented.</strong> <code>environment_overrides</code> (change obstacle geometry in code per episode); the six-variant × five-seed
+experiment (<code>robustness_experiment.py</code>); <code>ExactClearance</code>; the offscreen video renderer.</li>
+<li><strong>Results.</strong> Replanning 30/30; executions 60/60 with 0 contacts; old plans invalid in 20/20 episodes where the change mattered
+(they would have penetrated the new wall by 3–67 mm).</li>
+<li><strong>Finding.</strong> MuJoCo's box-box margin contacts are unreliable, so the v0.5 "15 mm" certificate did not hold for fingertip pads
+against box obstacles. Documented and pinned with a strict expected-failure test; not fixed because a planner change needed approval.</li>
+<li><strong>Tests.</strong> 176 (one expected failure). <strong>Report:</strong> <span class="file">v0.5.1-demo-brief.md</span>.</li>
+</ul>
+
+<h2 id="s-h-v052">v0.5.2 — collision-checker correctness (5dbeffd, 19 Oct)</h2>
+<ul>
+<li><strong>Implemented.</strong> An audit tool with certified ground truth; exact box-box distances in the checker
+(<code>exact_box_box</code>) with a provably safe pre-filter; vectorized contact reading; exact clearance metrics in the benchmarks; a
+profiling tool; video renderer labelled v0.5.2 that refuses to overwrite earlier videos.</li>
+<li><strong>Results.</strong> Only box-box margin contacts were wrong among 11 pair types; with the old checker 3 of 113 benchmark plans came within
+18.5–19.99 mm, now 0; success rates and execution accuracy unchanged; planning 6–46% slower.</li>
+<li><strong>Tests.</strong> 189, none expected to fail; the v0.5.1 expected failure was converted to a checker test plus a pinned MuJoCo-behaviour test.
+<strong>Report:</strong> <span class="file">v0.5.2-results.md</span>.</li>
+</ul>
+
+<h2 id="s-h-pattern">Patterns across the history</h2>
+<ul>
+<li>Each milestone first <em>audited</em> the previous one, and several "failures" turned out to be measurement or specification problems
+(infeasible references, misreported distances) rather than algorithm bugs.</li>
+<li>Historical benchmark scenarios and controller variants (<code>torque_mpc_v03</code>, <code>torque_ctc</code>) were kept unchanged as
+regression baselines; new scenarios were added beside them.</li>
+<li>Two MuJoCo behaviours that undermined collision claims (midphase and box-box margins) were found by checking results against an
+independent measurement.</li>
+<li>The servo MPC was never made competitive with PID; it remains in the code as a documented negative result.</li>
+</ul>

@@ -1,0 +1,194 @@
+<div class="part">Part III — Model Predictive Control<small>The principle, a worked example, the project's actual torque MPC, and what its experiments show.</small></div>
+
+<h1 class="chapter" id="ch-mpc1">MPC from first principles</h1>
+
+<p class="chapter-intro">Model predictive control chooses each command by solving an optimization problem about the future, again and again. This chapter builds the idea from scratch, works a small example by hand and by computer, and only then turns to the seven-joint robot.</p>
+
+<h2 id="s-what">What MPC is</h2>
+<p><strong>Intuition.</strong> When you drive, you do not decide the steering angle only from where the car is now.
+You look ahead at the road for the next few seconds, imagine how the car will respond to steering and braking,
+choose a plan that keeps you on the road comfortably, start executing its first moment, and then, a fraction
+of a second later, look again and re-plan. That is model predictive control:</p>
+<ol>
+<li>measure the current state;</li>
+<li>use a <strong>model</strong> to <strong>predict</strong> how the system would evolve over a finite future window for any candidate
+sequence of commands;</li>
+<li>choose the command sequence that minimizes a <strong>cost</strong> (tracking error, effort, roughness) while respecting
+<strong>constraints</strong> (motor limits, speed limits);</li>
+<li>apply only the <em>first</em> command; discard the rest; repeat at the next sampling instant.</li>
+</ol>
+<p><strong>Why it matters.</strong> PID and computed-torque control react to the current error. MPC is the standard method
+that <em>anticipates</em> the reference and handles <em>constraints explicitly</em>: if the motor can deliver at most 12 Nm,
+the optimizer plans within that limit instead of discovering it when the torque is clipped. That is exactly what
+distinguishes the torque MPC from CTC in this project's results.</p>
+
+<h2 id="s-name">Why it is called model predictive control</h2>
+<p><em>Model</em>: it needs an explicit mathematical model of the plant's dynamics. <em>Predictive</em>: it uses the model to
+predict future states over a horizon. <em>Control</em>: the output is the control input applied now. The family also goes by
+"receding-horizon control". In industry it has been used in chemical process control since the 1970s, where slow
+dynamics left minutes for each optimization; fast solvers have brought it to robots with millisecond sampling
+times.</p>
+
+<h2 id="s-recede">Receding-horizon optimization</h2>
+<figure id="fig-receding"><img class="w90" src="../figures/fig_receding.svg" alt="receding horizon">
+<figcaption>Receding horizon (schematic). At time $t_k$ the controller plans over the next $N T_s$ seconds (dashed),
+applies the first command, and at $t_{k+1}$ plans again from the new measurement over a window shifted by one
+step. Only the first piece of each plan is ever executed.</figcaption></figure>
+<p>Re-planning at every step is what makes MPC a <em>feedback</em> controller: each new plan starts from the measured
+state, so model errors and disturbances are corrected at the next update. The plan itself is open-loop over the
+horizon; the closed loop comes from repetition. The horizon "recedes": it always extends the same length into
+the future from the current time.</p>
+
+<h2 id="s-pred">Prediction models: continuous to discrete time</h2>
+<p>Physics gives a continuous-time model $\dot x = f(x, u)$. The controller only changes its command at sampling
+instants $t_k = kT_s$ and holds it constant in between (<strong>zero-order hold</strong>). It therefore needs the
+<em>discrete-time</em> map from one sampling instant to the next:</p>
+\[ x_{k+1} = F(x_k, u_k). \]
+<p><strong>Example: one joint.</strong> A single joint with inertia $I$ and torque $\tau$ (no gravity, no friction) has state
+$x = (\theta, \omega)$ and $\dot\theta = \omega$, $\dot\omega = \tau/I$. With $\tau$ constant over an interval of length
+$T_s$, integrating exactly gives</p>
+\[ \theta_{k+1} = \theta_k + T_s\,\omega_k + \frac{T_s^2}{2I}\,\tau_k, \qquad \omega_{k+1} = \omega_k + \frac{T_s}{I}\,\tau_k,
+\qquad\text{i.e.}\quad x_{k+1} = \underbrace{\begin{bmatrix}1 & T_s\\ 0 & 1\end{bmatrix}}_{A} x_k + \underbrace{\begin{bmatrix} T_s^2/2I \\ T_s/I\end{bmatrix}}_{B} \tau_k. \]
+<p>This is a <strong>linear</strong> model, $x_{k+1} = Ax_k + Bu_k$. Real robots are nonlinear (gravity contains sines;
+inertia depends on posture). <strong>Linear MPC</strong> approximates the nonlinear map by a linear (affine) one around the
+current operating point, $x_{k+1} \approx Ax_k + Bu_k + c$, re-computed at every update. <strong>Nonlinear MPC</strong>
+keeps $F$ nonlinear and solves a harder non-convex problem. The project uses linear MPC (Chapter 8).</p>
+
+<h2 id="s-vectors">State and control vectors</h2>
+<p>The <strong>state</strong> $x_k$ must contain everything needed to predict the future given the inputs. For a rigid
+arm that is the joint positions and velocities: $x = (q, \dot q) \in \mathbb{R}^{14}$ for 7 joints. The
+<strong>control</strong> (input) $u_k$ is what the controller sets: $u = \tau \in \mathbb{R}^7$ for the torque MPC, or 7
+servo setpoints for the servo MPC. Over a horizon of $N$ steps the unknowns are $u_0, \dots, u_{N-1}$, and with
+them the predicted states $x_1, \dots, x_N$.</p>
+
+<h2 id="s-horizon">Prediction and control horizons</h2>
+<p>The <strong>prediction horizon</strong> $N$ is how many steps ahead the model looks; $N T_s$ is the look-ahead time.
+Some formulations use a shorter <strong>control horizon</strong> $N_u &lt; N$, after which the input is held constant, to
+reduce the number of unknowns. Our MPCs use $N_u = N$. Longer horizons see further (they can start a manoeuvre
+earlier) but cost more computation, and a linearized model becomes less accurate far into the future. The
+sampling time $T_s$ trades responsiveness against the time available to solve each problem.</p>
+<div class="box verified"><span class="lbl">Values in this project</span>
+<p>Torque MPC: $T_s$ = 20 ms (50 Hz), $N$ = 25, look-ahead 0.5 s. Servo MPC: $T_s$ = 20 ms, $N$ = 15, 0.3 s
+(<span class="file">configs/default.yaml</span>).</p></div>
+
+<h2 id="s-cost">Objective (cost) functions</h2>
+<p>The cost turns "good behaviour" into a number. The most common form is a sum of weighted squares:</p>
+\[ J = \sum_{k=1}^{N} (x_k - r_k)^T Q\,(x_k - r_k) \;+\; \sum_{k=0}^{N-1} u_k^T R\,u_k \;+\; \sum_{k=0}^{N-1} (u_k - u_{k-1})^T S\,(u_k - u_{k-1}). \]
+<p>The first term penalizes deviation from the reference $r_k$ (position and velocity), the second penalizes effort,
+the third penalizes jerky changes of the command. The diagonal weight matrices $Q$, $R$, $S$ express priorities:
+large $Q$ means "track tightly"; large $R$ means "save torque". Squares are used because they make the problem
+a convex quadratic program (below) and punish large errors much more than small ones. Often the last stage gets
+a larger weight (a <em>terminal</em> weight) to stand in for the future beyond the horizon.</p>
+
+<h2 id="s-cons">State and actuator constraints</h2>
+<p>Constraints are what MPC handles better than any classical controller:</p>
+<ul>
+<li><strong>Input constraints</strong> $u_{\min} \le u_k \le u_{\max}$ (motor torque limits). Physically absolute, so they are
+imposed as <em>hard</em> constraints.</li>
+<li><strong>State constraints</strong> $x_{\min} \le x_k \le x_{\max}$ (joint position and speed limits). If a disturbance has already
+pushed the state outside, a hard state constraint makes the problem infeasible (no solution exists), which is
+dangerous for a controller. They are therefore usually <em>soft</em>: add a slack variable $s_k \ge 0$,
+require $x_{\min} - s_k \le x_k \le x_{\max} + s_k$, and penalize $s$ heavily in the cost,
+$\rho_2\|s\|^2 + \rho_1\sum s$. With a large enough linear weight $\rho_1$ (an <em>exact penalty</em>), the slack stays
+exactly zero whenever the hard version is feasible.</li>
+</ul>
+
+<h2 id="s-qp">Quadratic programming</h2>
+<p>Collect all unknowns in one vector $z = (x_1, \dots, x_N, u_0, \dots, u_{N-1}, s_1, \dots)$. The cost is quadratic
+in $z$ and every constraint, including the dynamics $x_{k+1} = Ax_k + Bu_k + c$, is linear. That is a
+<strong>quadratic program</strong> (QP) in the standard form used by the OSQP solver:</p>
+\[ \min_z \;\tfrac12 z^T P z + q^T z \qquad \text{subject to} \qquad l \le \mathcal{A} z \le u. \]
+<p>Equality constraints are rows with $l = u$. If $P$ is positive semidefinite the problem is <strong>convex</strong>: any local
+minimum is the global minimum, and reliable solvers find it in a bounded, predictable number of iterations. This
+is the decisive practical advantage of linear MPC over nonlinear MPC.</p>
+<p>Two ways to set up the QP exist. The <em>condensed</em> form eliminates the states using the dynamics
+($X = \Phi x_0 + \Gamma U$), leaving only the inputs: few variables, but dense matrices. The <em>sparse</em> (or
+simultaneous) form keeps the states as variables and the dynamics as equality constraints: more variables, but
+very sparse matrices that a sparse solver handles efficiently. Our MPCs use the sparse form; v0.3 measured a
+condensed variant and found it slower (94 ms per solve) because the matrices become dense.</p>
+<p><strong>OSQP</strong> (Operator Splitting Quadratic Program solver) solves such QPs with ADMM, an iterative
+method that alternates between a linear-system solve (with a factorized KKT matrix) and a simple projection onto
+the bounds. Its useful properties for MPC are that a <strong>warm start</strong> from the previous solution
+cuts iterations, an iteration limit bounds the solve time, and <strong>solution polishing</strong> refines the
+approximate ADMM solution to high accuracy when the active constraints have been identified. Its tolerances
+<code>eps_abs</code>/<code>eps_rel</code> define "converged".</p>
+
+<h2 id="s-example">A worked example: one joint, by hand and by computer</h2>
+<p>Take the single joint above with $I$ = 0.5 kg·m² and $T_s$ = 0.1 s:</p>
+\[ A = \begin{bmatrix}1 & 0.1 \\ 0 & 1\end{bmatrix}, \qquad B = \begin{bmatrix}0.01 \\ 0.2\end{bmatrix}. \]
+<p>Goal: move from rest at $\theta = 0$ to $\theta = 1$ rad and stop there, so $r = (1, 0)$. Weights: $Q = \mathrm{diag}(10, 1)$,
+$R = 0.1$, no rate term.</p>
+
+<h3>Horizon N = 1, by hand</h3>
+<p>With one step, $J(u_0) = (x_1 - r)^TQ(x_1 - r) + R u_0^2$ with $x_1 = Ax_0 + Bu_0$. Setting $dJ/du_0 = 0$:</p>
+\[ 2B^TQ(Ax_0 + Bu_0 - r) + 2Ru_0 = 0 \quad\Longrightarrow\quad u_0^* = \frac{B^TQ\,(r - Ax_0)}{B^TQB + R}. \]
+<p>From rest, $Ax_0 = 0$, $B^TQr = 0.01\cdot 10\cdot 1 = 0.1$, $B^TQB = 10\cdot 0.01^2 + 1\cdot 0.2^2 = 0.041$,
+so $u_0^* = 0.1/0.141 = $ <strong>0.709 Nm</strong>. The predicted state is $x_1 = (0.0071, 0.142)$. The one-step
+controller is greedy: it does not "know" that velocity built up now must be braked later, except through the
+velocity weight.</p>
+
+<h3>Horizon N = 20 with a torque limit, by computer</h3>
+<p>Now look 2 s ahead ($N$ = 20) and add the hard constraint $|\tau| \le 1$ Nm. This has 60 unknowns (40 states, 20
+torques), so we solve it as a QP with OSQP, exactly as the project's controllers do
+(<span class="file">docs/guide_src/make_figures.py</span>, <code>mpc_example</code>).</p>
+<div class="box measured"><span class="lbl">Computed for this guide</span>
+<ul>
+<li><strong>Without the limit</strong> the optimal first torques are 6.43, 1.84, −0.30, −1.15, … Nm: a large kick, then braking.
+The first value is 6.4 times the motor's limit.</li>
+<li><strong>With the limit</strong> the optimal plan is: full torque +1.0 Nm for 6 steps (0.6 s), a partial step of
+0.21 Nm, then braking (−0.71, −1.0, −1.0, −0.87, …) and a gradual approach. The predicted angle reaches 0.99 rad
+at the end of the horizon. This is the familiar "bang–coast–brake" shape, discovered by the optimizer rather than
+programmed.</li>
+<li><strong>In closed loop</strong> (re-solve every 0.1 s, apply the first torque) the joint reaches 0.78 rad at 1 s,
+0.9945 rad at 2 s and 0.9999 rad at 3 s, never exceeding 1 Nm.</li>
+</ul></div>
+<figure id="fig-mpc-ex"><img src="../figures/fig_mpc_example.svg" alt="MPC example">
+<figcaption>Worked example. Left: the first plan (k = 0) with and without the torque limit. Right: the closed loop,
+re-planning every step and applying only the first torque.</figcaption></figure>
+<p>Notice what happened. Nothing in the controller says "accelerate, then brake". The plan emerges from three
+ingredients: the model (which says how torque changes the state), the cost (which says what we want), and the
+constraint (which says what is possible). The same three ingredients, in 14 state dimensions instead of 2, are what
+<code>TorqueMPCController</code> solves 50 times per second.</p>
+
+<h2 id="s-nolearn">Why classical MPC needs no training</h2>
+<p>Nothing in MPC is learned from data. The model comes from physics (here, MuJoCo's equations evaluated at the
+current state); the cost and constraints are written by the engineer; the optimizer computes the answer from
+scratch at every step. There are no trainable parameters, no dataset and no training phase. Change the cost
+weights or the target and the very next solve reflects it. This is also why MPC needs an accurate model: it can
+only be as good as its predictions. (Learning can be combined with MPC, for example to learn a model or a terminal
+cost, but this project does not do so.)</p>
+
+<h2 id="s-rl">How MPC differs from reinforcement learning and learned policies</h2>
+<table id="tab-mpc-rl">
+<caption>Model predictive control versus reinforcement learning.</caption>
+<thead><tr><th></th><th>MPC (as in this project)</th><th>Reinforcement learning / learned policy</th></tr></thead>
+<tbody>
+<tr><td>Where the behaviour comes from</td><td>online optimization of an explicit cost with an explicit model</td><td>a function (e.g. neural network) trained offline by trial and error to maximize reward</td></tr>
+<tr><td>Model needed?</td><td>yes, explicitly</td><td>not necessarily (model-free RL) but needs a simulator or lots of data</td></tr>
+<tr><td>Computation at run time</td><td>solve an optimization every step (ms)</td><td>evaluate the network (µs–ms)</td></tr>
+<tr><td>Constraints</td><td>explicit, enforced in each solve</td><td>usually only encouraged through reward shaping</td></tr>
+<tr><td>Change the task</td><td>change the cost/reference; immediate</td><td>usually retrain</td></tr>
+<tr><td>Guarantees</td><td>analysable (with assumptions)</td><td>hard to certify</td></tr>
+<tr><td>Strength</td><td>precise, constraint-aware tracking of known dynamics</td><td>complex behaviours (contact-rich, perception-driven) that are hard to model or specify</td></tr>
+</tbody></table>
+<p>The two are complementary rather than rivals; many research systems put a learned high-level policy on top of a
+model-based low-level controller like ours (Chapter 19).</p>
+
+<h2 id="s-fail">What can go wrong: solver failure, instability, missed deadlines</h2>
+<ul>
+<li><strong>Infeasibility.</strong> Hard constraints that cannot all be satisfied (for example a state already outside
+a hard limit) leave the QP without a solution. Remedy: soft state constraints, which our MPCs use by default.</li>
+<li><strong>Ill-conditioning.</strong> Weights or variables spanning many orders of magnitude make the solver slow or inaccurate.
+The torque MPC optimizes normalized torques $\tau/\tau_{\max}$ for exactly this reason (Chapter 8).</li>
+<li><strong>Iteration limit.</strong> If OSQP needs more than <code>max_iter</code> = 500 iterations, the solve fails; our controllers then
+hand over to a fallback controller (PID or CTC) until the next successful update.</li>
+<li><strong>Model error.</strong> The plan is optimal for the <em>model</em>. If the model is wrong (wrong masses, linearization error far
+along the horizon, unmodelled push), the closed loop can perform poorly or, with aggressive weights, even become
+unstable: the servo MPC went unstable with a position weight of 1e5 (README, "MPC design notes").</li>
+<li><strong>Deadlines.</strong> On a real robot the next command is needed every $T_s$. If linearization plus the solve take
+longer, the update is late. This project measures that (deadline overruns) but, being a simulation, does not suffer
+from it physically (Chapter 9).</li>
+<li><strong>Stability is not automatic.</strong> Finite-horizon MPC is not guaranteed stable in general; theory provides terminal
+costs and constraints that guarantee it. Our controllers use a terminal weight multiplier but no terminal
+constraint, and their stability is established empirically, not proven.</li>
+</ul>

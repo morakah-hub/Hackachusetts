@@ -1,0 +1,11 @@
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.idea/
+.vscode/
+logs/
+results/
+MUJOCO_LOG.TXT
+# Local AI-assistant settings (machine-specific)
+.claude/settings.local.json

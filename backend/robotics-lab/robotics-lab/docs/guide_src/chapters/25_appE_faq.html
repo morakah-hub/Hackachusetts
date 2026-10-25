@@ -1,0 +1,61 @@
+<h1 class="appendix" id="app-faq">Common questions</h1>
+
+<h2>Does our MPC learn?</h2>
+<p>No. It has no trainable parameters and uses no data. At every update it linearizes MuJoCo's equations at the measured state and
+solves an optimization problem from scratch (Chapter 7). The only "memory" between updates is the warm start (the previous solution
+as a starting guess) and the disturbance observer's filtered estimate, which is an estimator, not learning.</p>
+
+<h2>How does the robot know the wall exists?</h2>
+<p>It is told. The wall is a box in <span class="file">environments/planning_demo.xml</span>; the planner's collision checker deep-copies the
+compiled MuJoCo model, wall included, and queries it. There is no sensing. In the wall-variant experiment the new geometry is passed
+in through <code>environment_overrides</code>, again exactly.</p>
+
+<h2>Does the controller run continuously?</h2>
+<p>In simulated time, yes: <code>compute()</code> is called every 2 ms of simulated time; the torque MPC re-solves every 20 ms and holds
+(and observer-corrects) its torque in between. In wall-clock time, no: headless runs advance as fast as the computer allows, and the
+viewer slows the simulation to match the wall clock. If computation is too slow, simulated time simply waits.</p>
+
+<h2>Why do we need RRT if we already have MPC?</h2>
+<p>They solve different problems. RRT-Connect searches the whole 7-D configuration space for a collision-free <em>route</em>, which is a
+global, non-convex problem. The MPC optimizes <em>torques</em> over the next 0.5 s to follow a given reference within motor limits, which is a
+local, convex problem with no knowledge of obstacles. Neither could do the other's job (Chapter 9, §"Why closed-loop MPC does not give
+obstacle avoidance").</p>
+
+<h2>Does the simulation use a GPU?</h2>
+<p>No. MuJoCo's physics, the planner and the OSQP solver all run on the CPU in a single process. The GPU is used only through OpenGL for
+drawing the interactive viewer and rendering the demo video.</p>
+
+<h2>What happens if the robot hits an obstacle?</h2>
+<p>MuJoCo computes contact forces, so the arm is physically stopped and pushed, as in reality. Nothing in the software reacts to it:
+the controller keeps trying to track the reference and pushes into the obstacle. The unsafe baseline shows this: 1,005–1,849 contact
+steps, the arm stuck 175–470 mm from the goal (Chapter 15). In planned runs, success is defined as zero contact steps, which every
+planned execution achieved.</p>
+
+<h2>Why is 50 Hz different from 500 Hz?</h2>
+<p>500 Hz is the physics rate (2 ms steps) and the rate at which PID, CTC and the observer act. 50 Hz is the torque MPC's re-planning
+rate: each QP takes about 5 ms to solve, so solving one every 2 ms is impossible in this implementation. Between MPC updates the
+torque is held, with a 500 Hz correction from the observer. A 100 Hz MPC with an equivalent 0.5 s horizon did not fit its 10 ms budget
+(Chapter 9).</p>
+
+<h2>Can this system control a real robot?</h2>
+<p>Not as it is. It has no hardware interface (the Panda is usually driven through Franka's real-time control interface at 1 kHz), no
+real-time guarantees (Python on Windows), no safety layer, and its controllers were tuned on an exact model with perfect sensors. The
+ideas transfer; the code would need a real-time implementation, state estimation, friction and payload identification, safety
+monitoring, and re-validation on hardware.</p>
+
+<h2>What makes a robotics project research-quality?</h2>
+<p>A clear question; a baseline to compare against; controlled experiments where one thing changes at a time; metrics measured on the
+system rather than on the algorithm's own predictions; enough runs to support the claim, with uncertainty stated; reproducibility
+(seeds, versions, commands); honest reporting of failures and limitations; and, ideally, results that hold beyond the specific set-up. This
+project does many of these well (baselines, controlled comparisons, independent measurements, reproducibility, honest limitations) and
+is weaker on sample sizes, breadth of scenarios and hardware validation (Chapter 20).</p>
+
+<h2>Why do the torque controllers look 1000× better than PID?</h2>
+<p>Mostly because of the actuator model, not the algorithm: PID drives stiff position servos whose setpoint steps and gravity sag limit
+accuracy, while the torque controllers command torque directly with an exact model of the plant. Comparisons are only fair within the same
+actuator group (Chapter 6).</p>
+
+<h2>Is the 15 mm clearance guaranteed?</h2>
+<p>It is a mathematical deduction that holds under stated assumptions: exact per-sample distances (audited for these shapes, not proven),
+MuJoCo's collision geometry, static obstacles, and exact tracking of the edge. It covers robot–environment pairs only. What was
+<em>measured</em> is stronger in practice (≥ 19.998 mm on the benchmark paths), but measurements are not guarantees (Chapter 11).</p>

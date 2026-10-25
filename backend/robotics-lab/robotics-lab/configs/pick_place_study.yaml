@@ -1,0 +1,55 @@
+# v0.6 payload study (pick_place_study.py). FROZEN before the evaluation runs (2026-10-19):
+# do not edit the cases, masses, configurations or criteria after results exist; add a new file instead.
+#
+# Question: how does disturbance estimation affect physical manipulation with an unmodelled payload,
+# and what trade-off does torque MPC offer compared with computed-torque control?
+#
+#   .\.venv\Scripts\python.exe pick_place_study.py                       # 4 configs x 3 masses x 10 cases
+#   .\.venv\Scripts\python.exe pick_place_study.py --sensitivity          # bounded timestep/contact check
+#
+# Every attempted episode is recorded (IK/planning/grasp/drop/placement failures stay in the denominator).
+
+extends: pick_place.yaml
+
+study:
+  # Primary configuration for the engineering target (>= 27 of 30 complete cycles, 0 forbidden contacts):
+  # the project's default torque-level controller, torque MPC with the disturbance observer.
+  primary: mpc_obs
+  target_successes: 27
+  # Actual object masses: a 50 x 50 x 60 mm block of plastic (~1000 kg/m^3), aluminium (~2700) and
+  # steel (~7700). The controllers' model is the same in all three (contact-free, nominal 0.4 kg object
+  # that cannot act on the arm): the payload is unmodelled. Grip: ~37 N squeeze, friction 1 -> ~3.7 kg
+  # static capacity; joint 5-7 torque limit 12 Nm vs ~1.5 Nm payload torque at the wrist.
+  masses: [0.15, 0.40, 1.15]
+  configurations:
+    ctc_noobs:   {type: torque_ctc, observer: false}   # 500 Hz
+    ctc_obs:     {type: torque_ctc, observer: true}    # 500 Hz, observer T = 10 ms
+    mpc_noobs:   {type: torque_mpc, observer: false}   # 50 Hz QP (torque held 20 ms), CTC fallback
+    mpc_obs:     {type: torque_mpc, observer: true}    # 50 Hz QP + 500 Hz observer feedthrough
+  # Bounded sensitivity check (selected evaluation cases, heaviest mass, both observer configurations):
+  sensitivity:
+    cases: [eval_02, eval_06, eval_09]
+    mass: 1.15
+    configurations: [ctc_obs, mpc_obs]
+    variants:
+      baseline: {}
+      timestep_1ms: {timestep: 0.001}
+      pyramidal_cone: {cone: pyramidal, impratio: 1}
+      elliptic_impratio_1: {cone: elliptic, impratio: 1}
+      friction_0.6: {friction_scale: 0.6}
+      noslip_5: {noslip_iterations: 5}
+
+# Evaluation cases: generated once with numpy default_rng(2026) (object x, place x in [0.42, 0.60];
+# |y| in [0.13, 0.28], on opposite sides of the table centre line), then frozen. Disjoint from the
+# development cases in pick_place.yaml. 0-4 open table, 5-9 around the static obstacle.
+cases:
+  - {name: eval_00, environment: pick_place, object: [0.452, 0.226], place: [0.504, -0.186], seed: 100}
+  - {name: eval_01, environment: pick_place, object: [0.484, -0.249], place: [0.583, 0.157], seed: 101}
+  - {name: eval_02, environment: pick_place, object: [0.538, 0.175], place: [0.594, -0.268], seed: 102}
+  - {name: eval_03, environment: pick_place, object: [0.534, -0.243], place: [0.513, 0.254], seed: 103}
+  - {name: eval_04, environment: pick_place, object: [0.501, 0.181], place: [0.470, -0.164], seed: 104}
+  - {name: eval_05, environment: pick_place_obstacle, object: [0.515, -0.195], place: [0.539, 0.132], seed: 105}
+  - {name: eval_06, environment: pick_place_obstacle, object: [0.501, 0.185], place: [0.455, -0.219], seed: 106}
+  - {name: eval_07, environment: pick_place_obstacle, object: [0.498, -0.175], place: [0.458, 0.261], seed: 107}
+  - {name: eval_08, environment: pick_place_obstacle, object: [0.564, 0.221], place: [0.482, -0.272], seed: 108}
+  - {name: eval_09, environment: pick_place_obstacle, object: [0.521, -0.195], place: [0.582, 0.178], seed: 109}

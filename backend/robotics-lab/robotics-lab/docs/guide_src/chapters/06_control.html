@@ -1,0 +1,161 @@
+<h1 class="chapter" id="ch-ctrl">Control theory fundamentals</h1>
+
+<p class="chapter-intro">How to compute motor commands that make the arm follow a reference: feedback, stability, PID, computed-torque control, disturbance observers, and the difference between position and torque control. Every controller in the repository is explained and compared.</p>
+
+<h2 id="s-loop">Open loop, closed loop and feedback</h2>
+<p><strong>Open-loop</strong> control computes commands from the goal alone, without looking at what the robot actually
+does: "apply this torque profile for 3 s". If the model is slightly wrong, or someone pushes the arm, the
+error grows unchecked. <strong>Closed-loop</strong> (feedback) control measures the actual state and corrects:
+the command depends on the <em>tracking error</em> $e = q_{\text{ref}} - q$. Every controller in Robotics Lab is
+closed-loop: <code>compute()</code> receives the measured $q$ and $\dot q$ at every 2 ms step.</p>
+
+<figure id="fig-loop">
+<svg class="diagram" width="600" height="130" viewBox="0 0 600 130" xmlns="http://www.w3.org/2000/svg">
+<defs><marker id="a6" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#44505c"/></marker></defs>
+<g font-size="10.5">
+<rect x="10" y="35" width="90" height="40" rx="4" fill="#e8f3ec" stroke="#3f8f5a"/><text x="55" y="52" text-anchor="middle">Task</text><text x="55" y="66" text-anchor="middle" font-size="9">q_ref(t), q̇_ref, q̈_ref</text>
+<circle cx="140" cy="55" r="11" fill="#fff" stroke="#44505c"/><text x="135" y="59">Σ</text><text x="122" y="47" font-size="9">+</text><text x="143" y="80" font-size="9">−</text>
+<rect x="180" y="35" width="120" height="40" rx="4" fill="#eaf1fa" stroke="#3a6ea8"/><text x="240" y="52" text-anchor="middle">Controller</text><text x="240" y="66" text-anchor="middle" font-size="9">PID / CTC / MPC</text>
+<rect x="340" y="35" width="100" height="40" rx="4" fill="#f3f5f7" stroke="#56636f"/><text x="390" y="52" text-anchor="middle">Actuators</text><text x="390" y="66" text-anchor="middle" font-size="9">servo or torque</text>
+<rect x="480" y="35" width="100" height="40" rx="4" fill="#f3f5f7" stroke="#56636f"/><text x="530" y="52" text-anchor="middle">Arm (plant)</text><text x="530" y="66" text-anchor="middle" font-size="9">MuJoCo</text>
+<line x1="100" y1="55" x2="127" y2="55" stroke="#44505c" marker-end="url(#a6)"/><line x1="151" y1="55" x2="178" y2="55" stroke="#44505c" marker-end="url(#a6)"/>
+<text x="155" y="48" font-size="9">e</text>
+<line x1="300" y1="55" x2="338" y2="55" stroke="#44505c" marker-end="url(#a6)"/><text x="306" y="48" font-size="9">u</text>
+<line x1="440" y1="55" x2="478" y2="55" stroke="#44505c" marker-end="url(#a6)"/><text x="450" y="48" font-size="9">τ</text>
+<path d="M580,55 L595,55 L595,110 L140,110 L140,68" fill="none" stroke="#44505c" marker-end="url(#a6)"/>
+<text x="330" y="124" font-size="9">measured q, q̇ (feedback)</text>
+<path d="M530,10 L530,33" stroke="#c0392b" marker-end="url(#a6)"/><text x="538" y="18" font-size="9" fill="#c0392b">disturbance (push, model error)</text>
+</g></svg>
+<figcaption>The feedback loop. The reference also feeds forward into the controller (not drawn): MPC uses the future
+reference, CTC its acceleration.</figcaption>
+</figure>
+
+<h2 id="s-stab">Stability and the second-order error equation</h2>
+<p>A controller is <strong>stable</strong> if errors die out instead of growing. The workhorse model is the damped
+second-order system</p>
+\[ \ddot e + 2\zeta\omega_n \dot e + \omega_n^2 e = 0. \]
+<p>Its solutions behave like $e^{\lambda t}$ with $\lambda = -\zeta\omega_n \pm \omega_n\sqrt{\zeta^2 - 1}$. If both roots
+have negative real part the error decays. $\omega_n$ (rad/s) sets how fast the error decays and $\zeta$ sets how
+much it oscillates: $\zeta = 1$ ("critical damping") is the fastest decay without overshoot. The settling time to
+about 2% is roughly $4/(\zeta\omega_n)$. For discrete-time systems $x_{k+1} = A x_k$, the condition becomes: all
+eigenvalues of $A$ inside the unit circle, $|\lambda_i| < 1$.</p>
+<div class="box derived"><span class="lbl">Example from our model</span>
+<p>The torque MPC's 20 ms prediction model, linearized at the home pose with the gravity-holding torque held
+constant, has a largest eigenvalue magnitude of 1.09 (computed for this guide). That is greater than 1, so
+<em>holding a constant torque</em> is open-loop unstable at that pose: any small deviation grows, as for a balanced
+pendulum. This is why the arm cannot be run open-loop and why the MPC must re-plan from fresh measurements.</p></div>
+
+<h2 id="s-pid">PID control</h2>
+<p><strong>Intuition.</strong> Push against the error (P), push harder if the error persists (I), and brake if the error is
+changing fast (D):</p>
+\[ u = K_p e + K_i \int_0^t e\,dt' + K_d \dot e. \]
+<p>P alone acts like a spring: it oscillates, and under a constant load such as gravity it leaves a steady error,
+since some error is needed to produce the holding force. D adds damping. I accumulates the remaining error
+until the holding force is supplied, at the cost of slower, possibly oscillatory transients and
+<em>integrator windup</em> if the actuator saturates. <a class="ref" href="#fig-toy-pid"></a> shows all four
+behaviours on a toy joint.</p>
+<figure id="fig-toy-pid"><img class="w80" src="../figures/fig_toy_pid.svg" alt="toy PID">
+<figcaption>Toy single joint under gravity (an illustration computed by <span class="file">docs/guide_src/make_figures.py</span>,
+not the Panda). PD leaves a gravity-induced offset; the integral removes it slowly; feeding forward the
+gravity torque removes it immediately.</figcaption></figure>
+
+<div class="box verified"><span class="lbl">Verified in source code: JointPIDController (v0.1)</span>
+<p><span class="file">controllers/pid.py</span>. It does <em>not</em> command torques. It shifts the setpoint of the Menagerie
+position servos, which are themselves PD controllers inside MuJoCo:</p>
+\[ u = q_{\text{ref}} + k_p e + k_i\!\int e\,dt + k_d(\dot q_{\text{ref}} - \dot q) + k_{\text{ff}}\,\dot q_{\text{ref}}, \]
+<p>with $k_p$ = 0.5, $k_i$ = 5.0, $k_d$ = 0, $k_{\text{ff}}$ = 0.1 (<span class="file">configs/default.yaml</span>). The servo
+produces $\tau = k_{p,s}(u - q) - k_{d,s}\dot q$. Without the outer loop, gravity makes the servo sag about 0.008 rad.
+The integral term supplies the holding offset. The feedforward term $0.1\,\dot q_{\text{ref}}$ cancels the servo's
+damping lag, because for every Panda servo $k_{d,s}/k_{p,s} = 0.1$, so a joint moving at $\dot q_{\text{ref}}$ needs its
+setpoint $0.1\,\dot q_{\text{ref}}$ ahead. Anti-windup clamps the integral's contribution to 0.05 rad. Runs every
+2 ms. Result (CLAUDE.md, tests): maximum tracking error below 4 mrad, steady-state error around 0.1 mrad.</p></div>
+
+<h2 id="s-ff">Feedforward and feedback</h2>
+<p>Feedback reacts to errors after they appear; <strong>feedforward</strong> supplies the command the reference is known to
+need, before any error appears. If you know the motion will require 20 Nm to hold against gravity and 5 Nm to
+accelerate, apply 25 Nm directly and let feedback handle only what the model got wrong. Good controllers
+combine both. In the project: PID's $k_{\text{ff}}\dot q_{\text{ref}}$, CTC's inverse dynamics of
+$\ddot q_{\text{ref}}$, and MPC's reference preview (it sees the whole next 0.5 s of the reference) are all
+feedforward.</p>
+
+<h2 id="s-ctc">Computed-torque control</h2>
+<p><strong>Intuition.</strong> If we know the robot's dynamics exactly, we can compute the torque that produces any desired
+acceleration, effectively cancelling gravity, inertia coupling and Coriolis forces. What remains is a simple
+double integrator per joint, which a PD law stabilizes.</p>
+<p><strong>Derivation.</strong> Choose the desired acceleration from the reference acceleration plus PD feedback,
+$\ddot q_{\text{des}} = \ddot q_{\text{ref}} + K_p e + K_d \dot e$, and the torque from inverse dynamics,
+$\tau = M(q)\ddot q_{\text{des}} + C(q,\dot q)\dot q + g(q)$. Substituting into the robot equation (with
+$\tau_{\text{ext}} = 0$) gives $M(\ddot q - \ddot q_{\text{des}}) = 0$, and since $M$ is invertible,
+$\ddot q = \ddot q_{\text{des}}$, i.e.</p>
+\[ \ddot e + K_d \dot e + K_p e = 0. \]
+<p>With $K_p = \omega_n^2$ and $K_d = 2\zeta\omega_n$ this is the standard second-order error equation: the gains
+directly set the error dynamics, identically for every posture.</p>
+<div class="box verified"><span class="lbl">Verified in source code: ComputedTorqueController (v0.3)</span>
+<p><span class="file">controllers/computed_torque.py</span>. $\omega_n$ = 25 rad/s, $\zeta$ = 1, so $K_p$ = 625 s⁻², $K_d$ = 50 s⁻¹.
+The torque is <code>ArmInverseDynamics.torque(q, qd, qdd_des)</code>, i.e. MuJoCo's <code>mj_inverse</code>, which includes
+armature and joint damping, clipped to the torque limits. Runs every 2 ms. It uses the controller's model (the
+plant itself unless mismatch is configured), so in nominal runs its model is <em>perfect</em>. It ignores velocity and
+joint limits: it follows any reference, feasible or not. v0.4 options: integral action
+$\ddot q_{\text{des}} \mathrel{+}= k_i\int e$ (error dynamics $\dddot e + K_d\ddot e + K_p\dot e + k_i e = 0$, stable
+by the Routh criterion only if $k_i < K_dK_p$ = 31,250, enforced by the constructor) and a disturbance
+observer ($\tau \leftarrow \tau - \hat d$). It is also the torque MPC's fallback.</p></div>
+
+<h2 id="s-dob">Disturbance estimation</h2>
+<p><strong>Intuition.</strong> A model-based controller is only as good as its model. Unknown forces, such as a push, a payload
+or masses that are 15% wrong, act like an unknown extra torque $d$. If the controller could measure $d$ it could cancel
+it. It cannot measure it directly, but it can infer it: compare the acceleration the robot actually showed with the
+acceleration the model predicted for the torque that was applied.</p>
+<p><strong>Mathematics.</strong> Model the plant as $M(q)\ddot q + h(q,\dot q) = \tau_{\text{applied}} + d$. Each physics
+step, using the discrete inverse dynamics ID:</p>
+\[ d_{\text{raw},k} = \mathrm{ID}\!\left(q_{k-1}, \dot q_{k-1}, \frac{\dot q_k - \dot q_{k-1}}{\Delta t}\right) - \tau_{\text{applied},k-1}, \qquad
+   \hat d_k = \hat d_{k-1} + \frac{\Delta t}{T}\left(d_{\text{raw},k} - \hat d_{k-1}\right). \]
+<p>The second equation is a first-order low-pass filter with time constant $T$ that smooths the noisy raw estimate.
+Using the <em>applied</em> (post-clipping) torque means the estimate does not wind up when the motors saturate.</p>
+<div class="box verified"><span class="lbl">Verified in source code: JointDisturbanceObserver (v0.4)</span>
+<p><span class="file">controllers/disturbance.py</span>: exactly the two equations above, with
+<code>mjENBL_INVDISCRETE</code> on a private model copy, $T$ = 10 ms, and $|\hat d|$ clipped to half the torque limit.
+The controller calls <code>update(q, qd, dt)</code> each step and <code>applied(tau)</code> after choosing its command. Off by
+default for CTC, <strong>on</strong> by default for the torque MPC, where it turns the MPC "offset-free" (Chapter 8).</p></div>
+<div class="box measured"><span class="lbl">Reported result (v0.4 report §5)</span>
+<p>Under a 30 N sideways push on the hand for 1 s, maximum joint error: CTC 35.2 mrad → 3.14 mrad with the observer;
+torque MPC 12.1 → 3.62 mrad. With controller masses 25% too low: CTC 9.09 → 0.84 mrad; MPC 3.44 → 0.95 mrad. Observer
+time constant chosen from a noise/rejection trade-off. With sensor noise, step-to-step torque jitter for CTC was
+0.21 Nm without observer, 0.45 Nm at T = 10 ms and 0.78 Nm at T = 5 ms (which rejected the push to 1.6 mrad).</p>
+<p class="small"><em>Wording discrepancy:</em> <span class="file">CLAUDE.md</span> says a 5 ms observer "triples torque jitter". The report's
+table shows ×1.7 relative to the chosen 10 ms observer and ×3.7 relative to no observer; the numbers above are the
+report's.</p></div>
+
+<h2 id="s-posvtorque">Position control versus torque control</h2>
+<p>With <strong>position servos</strong>, a stiff PD loop (up to 4500 Nm/rad) inside the simulator holds each joint;
+our controller only moves the setpoints. This is robust against pushes (the servo resists immediately) and
+needs no model, but the controller has only indirect authority over torque. Each change of setpoint
+$\Delta u$ creates a torque spike $k_p\Delta u$ lasting about 1 ms, which is clipped at the 12 Nm wrist limit.
+With <strong>torque motors</strong>, the controller decides every Nm. It can respect torque limits exactly and exploit
+the dynamics, but it is responsible for everything, including holding the arm against gravity. If its model
+is wrong or it has no integral/observer action, it deflects under pushes.</p>
+<div class="box measured"><span class="lbl">Reported result (v0.3 report §8, finding 3)</span>
+<p>Under the 30 N push, the servo controllers deflected 3.4 mrad (PID) and 2.0 mrad (servo MPC). The torque
+controllers without observer deflected 12 mrad (MPC) and 35 mrad (CTC). Stiff servos reject unmodelled pushes
+better than torque control without disturbance estimation.</p></div>
+
+<h2 id="s-compare">The four controllers compared</h2>
+<table id="tab-ctrl-compare">
+<caption>Every controller in the repository. Errors are maximum joint tracking errors on the benchmark's
+<code>demo</code> scenario (3 s moves, feasible) from <span class="file">docs/research/v0.3-results.md</span> §8 and
+<span class="file">v0.4-results.md</span> §8; exact model, no noise.</caption>
+<thead><tr><th></th><th>PID (<code>joint_pid</code>)</th><th>Servo MPC (<code>joint_mpc</code>)</th><th>CTC (<code>torque_ctc</code>)</th><th>Torque MPC (<code>torque_mpc</code>)</th></tr></thead>
+<tbody>
+<tr><td>Actuators</td><td>position servos</td><td>position servos</td><td>torque motors</td><td>torque motors</td></tr>
+<tr><td>Command</td><td>setpoint (rad)</td><td>setpoint (rad) from a QP</td><td>torque (Nm)</td><td>torque (Nm) from a QP</td></tr>
+<tr><td>Rate</td><td>500 Hz</td><td>50 Hz (holds between)</td><td>500 Hz</td><td>50 Hz (+500 Hz observer feedthrough)</td></tr>
+<tr><td>Model</td><td>none</td><td>linearized MuJoCo</td><td>exact inverse dynamics</td><td>linearized MuJoCo</td></tr>
+<tr><td>Looks ahead</td><td>no</td><td>0.3 s (N = 15)</td><td>no (uses q̈_ref)</td><td>0.5 s (N = 25)</td></tr>
+<tr><td>Enforces speed limits</td><td>no</td><td>soft, at knots</td><td>no</td><td>soft, at knots, tightened 0.5%</td></tr>
+<tr><td>Enforces torque limits</td><td>servo clip</td><td>soft (sustained torque)</td><td>clip</td><td>hard, exact</td></tr>
+<tr><td>Fallback</td><td>—</td><td>PID</td><td>—</td><td>CTC</td></tr>
+<tr><td>demo max error</td><td class="num">3.42 mrad</td><td class="num">7.83 mrad</td><td class="num">0.063 mrad</td><td class="num">0.0028 mrad</td></tr>
+<tr><td>30 N push max error</td><td class="num">3.44 mrad</td><td class="num">2.02 mrad</td><td class="num">35.2 (3.14 w/ obs.)</td><td class="num">12.1 (3.62 w/ obs.)</td></tr>
+</tbody></table>
+<p>The comparison groups matter: PID vs servo MPC and CTC vs torque MPC isolate the controller, while comparisons
+across the groups also change the actuator interface. The 1000× gap between PID (3.42 mrad) and torque MPC
+(0.0028 mrad) is mostly the actuator change, not MPC as such.</p>

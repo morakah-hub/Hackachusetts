@@ -1,0 +1,12 @@
+pair,geom_types,poses,overlap,separated_near,inside_clearance,uncertified,ambiguous,contact_missed_overlap,distance_missed_overlap,contact_false_safe,contact_false_alarm,contact_dist_err_min_mm,contact_dist_err_max_mm,distance_false_safe,distance_false_alarm,distance_err_max_mm,closest_contact_miss_mm,seconds
+fingertip pad (box) - wall (box),box-box,4000,1257,2743,1191,0,0,0,0,40,7,-4.073443895662037,6.977767231942768,0,0,2.7577662378050315e-09,4.264997022500976,12.8
+fingertip pad (box) - table top (box),box-box,4000,1270,2730,1212,0,0,0,0,27,9,-4.078064462075197,5.9576863977875165,0,0,2.0714680648960607e-10,4.660984780000968,12.3
+finger tooth (box) - wall (box),box-box,4000,1002,2998,1295,0,0,0,0,76,13,-4.837614725080538,3.1844365419657557,0,0,1.3292494817525313e-10,1.8527352853239654,14.2
+fingertip pad (box) - obstacle_1 (box),box-box,4000,1164,2836,1161,0,0,0,0,65,11,-5.6984728921205265,6.618980792601143,0,0,1.1352043979319382e-11,2.0925902635282223,13.3
+finger (mesh) - wall (box),mesh-box,4000,1451,2549,1137,0,0,0,0,0,0,0.0,0.004187220044555391,0,0,1.0724754417879012e-10,nan,77.4
+hand (mesh) - wall (box),mesh-box,4000,2089,1911,862,0,0,0,0,0,0,0.0,0.0009348815655316894,0,0,9.479571262075576e-11,nan,37.2
+link7 (mesh) - table top (box),mesh-box,4000,2044,1956,926,0,0,0,0,0,0,0.0,0.0009249703286674793,0,0,5.28355137419112e-10,nan,28.2
+fingertip pad (box) - obstacle_2 (cylinder),box-cylinder,4000,977,3018,1208,0,5,0,0,0,0,0.0,0.0063175493760217125,0,0,2.339386619610342e-05,nan,29.5
+hand (mesh) - obstacle_2 (cylinder),mesh-cylinder,4000,1700,2298,981,0,2,0,0,0,0,0.0,0.021649678636556993,0,0,4.679940904586937e-06,nan,197.5
+fingertip pad (box) - floor (plane),box-plane,4000,1447,2553,1255,0,0,0,0,0,0,-3.469446951953614e-15,3.469446951953614e-15,0,0,6.938893903907228e-15,nan,0.8
+hand (mesh) - floor (plane),mesh-plane,4000,3264,736,362,0,0,0,0,0,0,-1.3877787807814457e-14,1.3877787807814457e-14,0,0,1.3877787807814457e-14,nan,0.9

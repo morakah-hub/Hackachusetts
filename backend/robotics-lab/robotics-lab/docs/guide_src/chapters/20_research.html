@@ -1,0 +1,91 @@
+<h1 class="chapter" id="ch-res">Research readiness and future directions</h1>
+
+<p class="chapter-intro">An assessment of Robotics Lab as a research platform: genuine strengths, weaknesses, technical debt, valuable next experiments, and a possible v0.6 direction. Opinions in this chapter are the author's assessment based on the evidence in the previous chapters.</p>
+
+<h2 id="s-strengths">Genuine technical strengths</h2>
+<ul>
+<li><strong>Measurement discipline.</strong> Metrics come from the simulated robot, not from controller predictions; failures are reported
+with every run; historical baselines are preserved; versions and seeds are recorded. This is rarer in student and even research code
+than it should be.</li>
+<li><strong>Independent verification culture.</strong> Twice, results were checked against an independent measurement and a simulator behaviour
+was found that invalidated a claim (midphase, box-box margins). The v0.5.2 audit used certificates rather than a second numerical
+solver, which is methodologically sound.</li>
+<li><strong>A strong, exact low-level controller.</strong> A torque MPC built directly on MuJoCo's discrete dynamics with hard torque limits,
+normalized variables, offset-free disturbance estimation and validated fallback, achieving µrad tracking in nominal conditions.</li>
+<li><strong>Clear separation between planning and control</strong>, with stated and tested assumptions (the planner is invisible to the
+controllers; the reference stays on checked edges).</li>
+<li><strong>Explicit, honest limitations</strong> in every report.</li>
+</ul>
+
+<h2 id="s-weak">Engineering weaknesses</h2>
+<ul>
+<li><strong>Exact-model optimism.</strong> Nominal results use the plant's own model; only uniform mass errors were tested.</li>
+<li><strong>Narrow scenarios.</strong> One wall family, a few waypoint sets, 5–20 seeds per condition.</li>
+<li><strong>Single-threaded Python on a desktop OS.</strong> Timing is noisy and not real-time; 100 Hz MPC does not fit.</li>
+<li><strong>No perception, no reactivity, no manipulation</strong> (Chapter 17).</li>
+<li><strong>Servo MPC</strong> remains worse than PID and has no current purpose beyond documentation.</li>
+</ul>
+
+<h2 id="s-debt">Major technical debt</h2>
+<table id="tab-debt">
+<caption>Technical debt observed in the code.</caption>
+<thead><tr><th>Item</th><th>Where</th><th>Risk</th></tr></thead>
+<tbody>
+<tr><td>Direct MuJoCo use in every layer</td><td>controllers, planning, kinematics</td><td>simulator change is a rewrite; every new simulator needs its own distance audit</td></tr>
+<tr><td>Panda specifics outside <code>robots/</code></td><td>engine, prediction (arm block, fingers), configs</td><td>new robots need many edits</td></tr>
+<tr><td>Hand-written controller factory</td><td><code>simulation/runner.py</code></td><td>every new controller edits the composition root</td></tr>
+<tr><td>Cross-module private imports and a lazy import cycle</td><td><code>torque_mpc → mpc</code>; <code>planning_benchmark ↔ robustness</code></td><td>fragile refactoring</td></tr>
+<tr><td>Stale documentation strings</td><td>runner docstring, default.yaml comment, <code>controllers/__init__</code> exports</td><td>misleading new readers</td></tr>
+<tr><td>Empty placeholder</td><td><code>tasks/pick_place.py</code></td><td>suggests functionality that does not exist</td></tr>
+<tr><td>Rest-to-rest via points</td><td>tasks</td><td>slow motions; blocks reactive replanning</td></tr>
+<tr><td>Unmerged branch chain</td><td>Git: <code>master</code> at v0.1</td><td>the default branch does not represent the project</td></tr>
+</tbody></table>
+
+<h2 id="s-standard">What is standard engineering, and what could be scientifically interesting</h2>
+<p><strong>Standard</strong> (well-known methods, carefully implemented): DLS inverse kinematics, computed-torque control, linear MPC with OSQP,
+disturbance observers, RRT-Connect with shortcutting, quintic and double-S time scaling, margin-based clearance. None of these is new;
+their value here is the integration and the measurements.</p>
+<p><strong>Potentially interesting</strong>, if pursued rigorously:</p>
+<ul>
+<li><strong>Reliability of simulator geometry queries for safety claims.</strong> The finding that a mainstream simulator's margin contacts are wrong
+for some primitive pairs, and the certificate-based audit, generalize: any planner that uses a physics engine's contact margins for
+clearance should audit them. A systematic study across engines and shape pairs would be a useful contribution.</li>
+<li><strong>Certified clearance under tracking error.</strong> Combining the discrete edge certificate with measured or bounded tracking error of the
+torque MPC to state an execution-level clearance bound.</li>
+<li><strong>When does torque MPC beat CTC + observer?</strong> The data show MPC wins nominal tracking and constraint handling while CTC + observer wins
+disturbance rejection; characterizing the trade-off (noise, delay, model error) is a well-posed controlled study.</li>
+<li><strong>Perception-in-the-loop margins</strong>: how clearance must grow with depth-estimation error (Chapter 18's experiment).</li>
+</ul>
+
+<h2 id="s-nextexp">The most valuable next experiments</h2>
+<ol>
+<li>Realistic sensing and delay: encoder quantization, velocity filtering, one control period of computation delay; re-tune and compare MPC
+and CTC + observer.</li>
+<li>Richer model error: friction, damping, armature, centre of mass, payload; test the observer's limits.</li>
+<li>Randomized planning scenarios (random obstacles, starts and goals) with hundreds of episodes, to estimate failure rates below the few
+percent the current samples can bound.</li>
+<li>Blended trajectories through via points (with the blended curve collision-checked), measuring time saved.</li>
+<li>LTV/SQP-RTI prediction to reduce the k³ growth of open-loop prediction error, and its effect on constraint predictions.</li>
+</ol>
+
+<h2 id="s-connect2">Connecting to autonomous-manipulation research</h2>
+<p>Most current manipulation research combines learned components (perception, grasp prediction, policies trained by imitation or
+reinforcement learning) with model-based layers for safety and precision. Robotics Lab's motion layer is a reasonable model-based
+bottom layer: a learned policy could output goals or short reference segments, the planner and collision checker would act as a
+safety filter, and the torque MPC would execute. The evaluation harness (seeded episodes, exact clearance, contact counts, explicit
+failure statuses) is directly reusable for evaluating such policies. The prerequisite is a manipulation task (objects, grasping) and,
+for learning, many fast simulated episodes, which raises the cost of the current Python MPC.</p>
+
+<h2 id="s-v06">An appropriate v0.6 direction</h2>
+<div class="box proposal"><span class="lbl">Proposal — not started</span>
+<p>The project's own plan names pick-and-place next. A focused v0.6 could be <strong>a minimal, measured pick-and-place in a known world</strong>:</p>
+<ol>
+<li>add one graspable box to a scene and a stable placement target;</li>
+<li>extend IK to full 6-D pose (position + orientation) for top-down grasps;</li>
+<li>phase-dependent collision rules (allow finger–object contact during grasp; treat the grasped object as robot geometry while carrying);</li>
+<li>close the gripper through actuator 8 and verify grasp success physically (object lifts, does not slip);</li>
+<li>carry with the disturbance observer absorbing the payload; measure tracking with and without the observer;</li>
+<li>evaluate over seeded object poses: success rate, contacts other than the grasp, clearance, placement error.</li>
+</ol>
+<p>This uses every existing layer, adds the missing manipulation pieces one at a time, and keeps the project's discipline of measured,
+reproducible claims. Perception and reactive replanning would naturally follow as v0.7+.</p></div>

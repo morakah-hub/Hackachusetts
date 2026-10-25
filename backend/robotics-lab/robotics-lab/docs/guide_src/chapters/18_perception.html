@@ -1,0 +1,64 @@
+<h1 class="chapter" id="ch-perc">How would perception work?</h1>
+
+<p class="chapter-intro">An educational, forward-looking chapter. Nothing in it exists in the code. It explains the concepts a perception system would need and how one could connect to the existing planner.</p>
+
+<div class="box proposal"><span class="lbl">Status</span><p>This whole chapter describes proposals. Today the planner receives obstacle geometry
+directly from the compiled MuJoCo model (Chapter 17).</p></div>
+
+<h2 id="s-rgb">RGB cameras</h2>
+<p>A colour camera measures, for each pixel, the light arriving from one direction. The <strong>pinhole model</strong> relates a 3-D point
+$(X, Y, Z)$ in the camera frame to its pixel $(u, v)$:</p>
+\[ u = f_x \frac{X}{Z} + c_x, \qquad v = f_y \frac{Y}{Z} + c_y, \]
+<p>with focal lengths $f_x, f_y$ and principal point $(c_x, c_y)$ in pixels (the <em>intrinsics</em>). Depth $Z$ is lost: a single image
+cannot tell a small near object from a large far one. RGB images are rich in appearance information (what an object is) but poor
+in geometry.</p>
+
+<h2 id="s-depth">Depth cameras and point clouds</h2>
+<p>A <strong>depth camera</strong> (stereo, structured light or time-of-flight) also measures $Z$ per pixel. Inverting the pinhole model turns
+each pixel into a 3-D point, $X = (u - c_x)Z/f_x$, $Y = (v - c_y)Z/f_y$; all pixels together form a <strong>point cloud</strong>. MuJoCo can
+render depth images (<code>mujoco.Renderer</code> with depth rendering), so a simulated depth camera could be added without new
+dependencies; in this project the renderer is used only for the demo video (<code>tools/render_demo_video.py</code>).</p>
+
+<h2 id="s-tf">Coordinate transforms</h2>
+<p>Points measured in the camera frame must be expressed in the world (or robot base) frame before the planner can use them:
+$p_W = T_{WC}\,p_C$ with the homogeneous transform of the camera (its <em>extrinsics</em>, Chapter 4). For a camera mounted on the
+hand, $T_{WC} = T_{W,\text{hand}}(q)\,T_{\text{hand},C}$ depends on the joint angles: forward kinematics again. Errors in $T_{WC}$
+(calibration) shift every obstacle, so they must be smaller than the clearance margin.</p>
+
+<h2 id="s-detect">Object detection and environment reconstruction</h2>
+<p><strong>Object detection</strong> finds and labels objects in images (classically with features, today mostly with neural networks), giving
+bounding boxes or masks. <strong>Reconstruction</strong> turns depth data into geometry usable for collision checking. Common representations:
+fitted primitives (boxes, cylinders) for known object types; voxel grids or octrees (OctoMap) marking occupied space; signed distance
+fields (each voxel stores the distance to the nearest surface), which give distance queries directly; and meshes.</p>
+
+<h2 id="s-wm">World models</h2>
+<p>A <strong>world model</strong> is the robot's current belief about its surroundings: which objects exist, where they are, how certain that is,
+and when it was last observed. The planner should query the world model, not the sensors directly. In this project the
+"world model" is implicit: the MuJoCo model compiled at episode start, possibly modified with <code>environment_overrides</code>.</p>
+
+<h2 id="s-unc">Uncertainty and occlusion</h2>
+<p>Perception is never exact: depth noise grows with distance, edges are blurred, reflective or transparent surfaces fail, and
+<strong>occlusion</strong> hides whatever is behind other objects (including behind the robot's own arm). A safe planner must treat unobserved
+space as possibly occupied and inflate observed obstacles by the measurement uncertainty. The 20 mm clearance, which today only absorbs
+discretization and tracking error, would have to absorb perception error as well; Chapter 11's certificate assumed exact geometry.</p>
+
+<h2 id="s-feedback">Sensor feedback and detecting obstacles while moving</h2>
+<p>Cameras run at 10–60 Hz with tens of milliseconds of latency, far slower than the 500 Hz control loop. Detecting a new obstacle
+during motion requires: continuously updating the world model; checking the remaining part of the current plan against it (the
+existing <code>CollisionChecker.path_valid</code> does exactly this for old plans, Chapter 15, E8); and, if it is no longer valid, stopping
+safely or replanning (Chapter 19).</p>
+
+<h2 id="s-connect">Connecting perception to our planner</h2>
+<div class="box proposal"><span class="lbl">A possible design</span>
+<ol>
+<li>Render RGB-D images from one or two simulated cameras in MuJoCo at 10–30 Hz.</li>
+<li>Convert depth to a point cloud in the world frame using the known camera pose.</li>
+<li>Remove points belonging to the robot (render a robot mask, or test points against the robot's collision geometry at the current $q$).</li>
+<li>Fit boxes to clustered points (the scenes' obstacles are boxes and a cylinder), or build a voxel/distance grid.</li>
+<li>Write the result into the planner's model: for boxes, through geometry overrides (as v0.5.1 does with exact values today);
+for grids, through a new <code>CollisionWorld</code> backend (Chapter 13) that answers distance queries.</li>
+<li>Inflate obstacles by an uncertainty margin and re-run the audit methodology of v0.5.2 on the new distance queries before claiming
+any clearance.</li>
+</ol>
+<p>A natural first experiment, in the spirit of v0.5.1: repeat the wall-variant experiment with geometry estimated from simulated depth
+images instead of given exactly, and measure how the estimation error must be absorbed by the clearance.</p></div>

@@ -1,0 +1,232 @@
+<h1 class="chapter" id="ch-coll">Collision detection and clearance</h1>
+
+<p class="chapter-intro">The planner is only as trustworthy as its collision checker. This chapter explains how a configuration and an edge are judged safe, what the 20 mm clearance and the "15 mm" certificate really mean, and the story of the box-box near-miss bug found in v0.5.1 and fixed in v0.5.2.</p>
+
+<h2 id="s-geom">Robot collision geometry</h2>
+<p>A physics engine does not collide the detailed visual meshes of a robot; it collides simpler <em>collision geoms</em>.
+For the Menagerie Panda, each link's collision shape is a convex mesh (MuJoCo uses the convex hull of each mesh), and
+each finger has one mesh plus five small boxes: a 17 × 8 × 17 mm fingertip pad and four 6 × 4 × 6–7 mm "teeth".
+The environment uses primitives: a plane (floor), boxes (table top and legs, wall, ceiling, obstacle_1) and a cylinder
+(obstacle_2).</p>
+<table id="tab-geoms">
+<caption>Collidable geometry in the planning scenes (from the compiled model, listed for v0.5.2).</caption>
+<thead><tr><th>Robot side</th><th>Environment side</th><th>Pair types that occur</th></tr></thead>
+<tbody>
+<tr><td>12 convex meshes: link0–link7 (link5 has 3), hand, two finger meshes</td><td>floor (plane)</td><td>mesh–plane, box–plane</td></tr>
+<tr><td>10 boxes: 5 per finger (pad + 4 teeth)</td><td>table top, 4 legs, wall, ceiling, obstacle_1 (boxes)</td><td>mesh–box, <strong>box–box</strong></td></tr>
+<tr><td></td><td>obstacle_2 (cylinder)</td><td>mesh–cylinder, box–cylinder</td></tr>
+</tbody></table>
+<p>The difference between the collision model and the real robot matters: guarantees in this chapter are about these
+convex shapes, not about the physical Panda's surfaces.</p>
+
+<h2 id="s-cdet">Contact detection and minimum-distance queries</h2>
+<p>MuJoCo's <code>mj_collision</code> reports <strong>contacts</strong>: for each pair of geoms closer than their combined margin it creates
+a contact with a signed distance <code>dist</code> (negative means penetration). A different function,
+<code>mj_geomDistance(m, d, g1, g2, distmax, fromto)</code>, returns the <strong>minimum distance</strong> between two specific geoms
+(up to <code>distmax</code>) and the two closest points. For convex shapes such distances are computed with the GJK algorithm,
+which iteratively searches the Minkowski difference of the two shapes for the point closest to the origin; penetration
+depth uses the related EPA algorithm.</p>
+
+<h2 id="s-rvs">Robot–environment versus self-collision</h2>
+<p>Two kinds of collision matter: the robot against the world and the robot against itself (for example the hand
+against the upper arm). MuJoCo filters pairs before testing them. Its <code>contype</code>/<code>conaffinity</code> bitmasks must
+match, bodies connected by a joint (parent and child) are not tested against each other, and explicit
+<code>&lt;exclude&gt;</code> pairs are skipped. The Menagerie model excludes link0–link1, and our engine adds an exclusion between
+the robot base and the table it stands on (<code>build_spec</code>, <span class="file">simulation/engine.py</span>, line 66).</p>
+
+<h2 id="s-margin">Safety margins and the configuration check</h2>
+<p>A configuration $q$ is <strong>valid</strong> (<code>CollisionChecker.is_valid</code>, <span class="file">planning/collision.py</span>) if</p>
+<ol>
+<li>it lies inside the joint limits shrunk by 0.05 rad, and</li>
+<li>no robot geom penetrates another robot geom, and</li>
+<li>every robot–environment distance is at least the <strong>clearance</strong> $c$ = 20 mm.</li>
+</ol>
+<p><strong>How the clearance is implemented.</strong> The checker deep-copies the compiled plant model and sets
+<code>geom_margin = 0.02</code> on every collidable environment geom. MuJoCo uses the larger of two geoms' margins for a pair,
+so robot–environment pairs now produce contacts already at distances below 20 mm, while robot–robot pairs keep margin
+0 (self-collision means penetration). "Is there any robot contact?" then answers conditions 2 and 3 in one MuJoCo
+call. The plant model itself is never modified, and the checker writes only its own scratch data.</p>
+<pre class="src" data-src="planning/collision.py, CollisionChecker._collide and in_collision (lines 212–268, abridged)">def _collide(self, q):
+    d = self.data                       # private MjData of the private model copy
+    d.qpos[:] = self.base_qpos          # fingers etc. as in the plant
+    d.qpos[self.qpos_adr] = q
+    mujoco.mj_kinematics(self.model, d)
+    mujoco.mj_collision(self.model, d)  # contacts, with 20 mm margins on obstacles
+    self.config_checks += 1
+
+def in_collision(self, q):
+    self._collide(q)
+    return next(self._robot_contacts(), None) is not None   # any robot contact, incl. exact box-box (v0.5.2)</pre>
+<div class="box warning"><span class="lbl">First MuJoCo pitfall (found in v0.5): the midphase ignores margins</span>
+<p>A test sampling the executed demo found a configuration 8.8 mm from the wall, below the promised 15 mm. The cause
+was MuJoCo's midphase (per-body bounding-volume culling for multi-geom bodies such as the fingers), which does not
+account for the other geom's margin and dropped a finger–wall pair 8.5 mm apart under a 20 mm margin. Over 3,000
+random configurations per scene it missed 14 of 91 and 16 of 74 near misses. The checker's model copy disables it
+(<code>mjDSBL_MIDPHASE</code>, line 119); with it off, 0 false negatives and 0 false positives against exhaustive
+<code>mj_geomDistance</code> (v0.5 report §2). <code>test_checker_matches_exhaustive_distance_ground_truth</code> guards this.</p></div>
+
+<h2 id="s-edge">Collision checking along edges</h2>
+<p>The planner executes straight joint-space edges, $q(s) = q_0 + s(q_1 - q_0)$, $s \in [0,1]$. Checking a finite number
+of configurations on the edge leaves gaps; the question is how dense the samples must be. The checker derives the
+spacing from a bound on how far <em>any point of the robot's collision geometry</em> can move.</p>
+<div class="box derived"><span class="lbl">The lever-arm motion bound</span>
+<p>A point $p$ on the robot moves, when joint $j$ rotates at rate $\dot q_j$, with velocity $\omega_j \times (p - o_j)$,
+where $o_j$ is a point on joint $j$'s axis. Its speed is at most $|\dot q_j|\,\|p - o_j\|$. Let $R_j$ bound the
+distance from joint $j$'s anchor to any collision geometry that joint $j$ moves, for every posture. Then along the
+edge, with $\dot q = q_1 - q_0$ per unit $s$:</p>
+\[ \left\|\frac{dp}{ds}\right\| \le \sum_j R_j\,|q_{1,j} - q_{0,j}| \qquad\Longrightarrow\qquad \text{path length of } p \text{ over the edge} \le \sum_j R_j |\Delta q_j|. \]
+<p>$R_j$ is computed in <code>_lever_arms</code> (line 166) by the triangle inequality, posture-independently: the distance from
+the joint anchor to its body origin, plus the chain of body offsets down to the geom's body (plus extra for off-origin
+hinges and slide ranges), plus the geom's offset and bounding radius. Values:
+[1.149, 1.149, 0.833, 0.751, 0.358, 0.358, 0.270] m.</p></div>
+<p>The edge is split into $n$ intervals with</p>
+\[ n = \left\lceil \max\left( \frac{\sum_j R_j|\Delta q_j|}{\Delta_c},\; \frac{\max_j |\Delta q_j|}{\Delta_q} \right) \right\rceil,
+\qquad \Delta_c = 10 \text{ mm (cartesian\_step)}, \quad \Delta_q = 0.05 \text{ rad}. \]
+<span class="eqsrc">planning/collision.py, edge_samples, lines 200–204</span>
+<p>so that no robot point travels more than 10 mm between consecutive samples. The interior samples are visited
+coarse-to-fine (midpoint first, then quarters, …; <code>_coarse_to_fine</code>), so a blocked edge is usually rejected
+after a few checks. Edge endpoints are checked separately.</p>
+
+<h2 id="s-cert">The clearance certificate and its assumptions</h2>
+<figure id="fig-edgecert">
+<svg class="diagram" width="580" height="150" viewBox="0 0 580 150" xmlns="http://www.w3.org/2000/svg">
+<g font-size="10">
+<rect x="20" y="10" width="540" height="22" fill="#f4d4cf" stroke="#c0392b"/><text x="30" y="25">obstacle surface</text>
+<line x1="20" y1="57" x2="560" y2="57" stroke="#c0392b" stroke-dasharray="4 3"/><text x="440" y="52" font-size="9" fill="#c0392b">clearance c = 20 mm</text>
+<line x1="20" y1="44" x2="560" y2="44" stroke="#7a4fa3" stroke-dasharray="2 3"/><text x="440" y="41" font-size="9" fill="#7a4fa3">c − Δc/2 = 15 mm</text>
+<path d="M40,100 C120,62 200,62 280,100 S440,138 540,100" fill="none" stroke="#1f5f8b" stroke-width="2"/>
+<g fill="#1f5f8b"><circle cx="40" cy="100" r="4"/><circle cx="160" cy="71" r="4"/><circle cx="280" cy="100" r="4"/><circle cx="410" cy="125" r="4"/><circle cx="540" cy="100" r="4"/></g>
+<text x="135" y="92" font-size="9">sample k</text><text x="255" y="120" font-size="9">sample k+1</text>
+<line x1="220" y1="68" x2="220" y2="57" stroke="#2e8b57"/><text x="226" y="66" font-size="9" fill="#2e8b57">worst point between samples</text>
+<text x="30" y="145" font-size="9.5">A robot point travels ≤ Δc = 10 mm between samples, so it is always within Δc/2 of a sampled position (along its path).</text>
+</g></svg>
+<figcaption>Why sampling every 10 mm of robot motion with a 20 mm clearance certifies 15 mm between samples (schematic).</figcaption>
+</figure>
+<div class="box derived"><span class="lbl">Deduction</span>
+<p><strong>Claim.</strong> If every sample on an edge has robot–environment distance ≥ $c$, then every configuration on the edge has
+distance ≥ $c - \Delta_c/2$ = 15 mm.</p>
+<p><strong>Proof sketch.</strong> Take any configuration between samples $k$ and $k+1$ and any robot point $p$. Its path from
+sample $k$ to sample $k+1$ has length at most $\Delta_c$, so it is within $\Delta_c/2$ (along the path, hence in straight
+line) of its position at one of the two samples, where its distance to every obstacle was ≥ $c$. Distance to a set is
+1-Lipschitz in position, so its distance now is ≥ $c - \Delta_c/2$. This holds for every point, hence for the robot.</p>
+<p><strong>Assumptions.</strong> (1) The per-sample answer "distance &lt; $c$?" is exact. (2) The geometry is MuJoCo's convex collision
+shapes. (3) Obstacles do not move during the edge. (4) The robot follows the edge exactly. (5) It covers robot–environment
+pairs only: self-collision has margin 0 and is checked only at samples, so a brief self-intersection between samples is
+not excluded.</p></div>
+<p>Assumption (4) is about execution, not planning. The controllers track the reference with errors well below
+0.5 mrad on the planning scenes, i.e. tenths of a millimetre at the hand, which is small compared with the 5 mm
+margin between 20 and 15 mm, but it is a measured observation, not part of the proof. Assumption (1) failed for one pair
+type until v0.5.2, as the next sections explain.</p>
+
+<h2 id="s-boxbox">The box-box near-miss issue (v0.5.1)</h2>
+<p><strong>The discovery.</strong> While measuring clearances in the v0.5.1 wall-robustness experiment, the contact-based monitor
+reported 14.98 mm during one execution (thicker wall, seed 3), below the claimed 15 mm. Investigation showed a
+measurement problem rather than a near collision: for the fingertip pad (a box) against the box-shaped wall, MuJoCo's
+<code>contact.dist</code> said 14.64 mm while <code>mj_geomDistance</code> and an independent vertex-to-box computation both said
+20.0 mm. At a neighbouring sample the error had the opposite sign: the checker accepted a configuration whose true
+distance was 19.94 mm, because no contact was generated at all.</p>
+<p><strong>Isolation.</strong> In an empty model with just a pad-sized box near a wall-sized box and a 20 mm margin, over 20,000
+random poses: 260 of 14,568 poses within 30 mm had a true distance below 20 mm but produced <strong>no contact</strong>, the
+closest only 1.25 mm from the wall; where contacts were produced, <code>contact.dist</code> erred by −4.8 to +6.7 mm; actual
+penetration was always detected. The conclusion: MuJoCo 3.16's dedicated box-box routine does not produce reliable
+<em>margin</em> contacts. v0.5.1 documented the problem, pinned it with a strict expected-failure test, and left the planner
+unchanged because a planner change needed approval.</p>
+
+<h2 id="s-audit">The investigation (v0.5.2)</h2>
+<p><strong>Question.</strong> Which robot–environment pair types are affected, and is <code>mj_geomDistance</code> a trustworthy
+replacement? <code>tools/audit_clearance.py</code> builds, for each of 11 pair types in the scenes, an isolated two-geom model
+with the real Panda geometry (mesh vertices copied from the compiled model), the checker's solver flags and a 20 mm
+margin, and places the robot geom at 4,000 random poses within 40 mm of the obstacle.</p>
+<p><strong>Ground truth that does not trust MuJoCo.</strong></p>
+<ul>
+<li><em>Overlap</em> is decided by a linear program (SciPy <code>linprog</code>): does some convex combination of the robot geom's
+vertices lie inside the obstacle? (For the cylinder, inscribed and circumscribed 64-gon prisms bracket the truth.)</li>
+<li><em>Separation distance</em> is <strong>certified by a duality gap</strong>: MuJoCo's witness points must lie inside their geoms
+(which proves an upper bound $\|a - b\|$), and the support functions of both shapes along the witness direction give a
+separating-plane lower bound $\min_{y\in B} n\cdot y - \max_{x\in A} n\cdot x$, valid for any direction $n$. When upper and
+lower bounds agree within 1 µm, the distance is proven, independently of how MuJoCo found the points.</li>
+<li>A first attempt used a QP solver as ground truth. It disagreed with MuJoCo in 3 of 1,127 poses, but inspection showed
+the QP had not converged and MuJoCo was right; the certificate approach replaced it (worklog §2).</li>
+</ul>
+<div class="box measured"><span class="lbl">Reported results (v0.5.2 report §2, docs/research/v0.5.2-audit.csv)</span>
+<table class="small"><thead><tr><th>pair type</th><th>poses &lt; 20 mm</th><th>contacts: false "safe" (closest)</th><th>contact.dist error</th><th>geomDistance wrong</th><th>geomDistance error bound</th></tr></thead>
+<tbody>
+<tr><td>fingertip pad – wall (box–box)</td><td class="num">1191</td><td class="num"><strong>40</strong> (4.26 mm)</td><td>−4.07 … +6.98 mm</td><td class="num">0</td><td class="num">3e-9 mm</td></tr>
+<tr><td>fingertip pad – table top (box–box)</td><td class="num">1212</td><td class="num"><strong>27</strong> (4.66 mm)</td><td>−4.08 … +5.96 mm</td><td class="num">0</td><td class="num">2e-10 mm</td></tr>
+<tr><td>finger tooth – wall (box–box)</td><td class="num">1295</td><td class="num"><strong>76</strong> (1.85 mm)</td><td>−4.84 … +3.18 mm</td><td class="num">0</td><td class="num">1e-10 mm</td></tr>
+<tr><td>fingertip pad – obstacle_1 (box–box)</td><td class="num">1161</td><td class="num"><strong>65</strong> (2.09 mm)</td><td>−5.70 … +6.62 mm</td><td class="num">0</td><td class="num">1e-11 mm</td></tr>
+<tr><td>finger, hand, link7 meshes – boxes</td><td class="num">2925</td><td class="num">0</td><td>0.00 mm</td><td class="num">0</td><td class="num">≤ 5e-10 mm</td></tr>
+<tr><td>pad / hand – cylinder</td><td class="num">2189</td><td class="num">0</td><td>≤ 0.02 mm</td><td class="num">0</td><td class="num">≤ 2e-5 mm</td></tr>
+<tr><td>pad / hand – floor plane</td><td class="num">1617</td><td class="num">0</td><td>0.00 mm</td><td class="num">0</td><td class="num">≤ 1e-14 mm</td></tr>
+</tbody></table>
+<p>44,000 counted poses in total; penetration detected by every method on all 17,665 overlapping poses.</p></div>
+<p><strong>Conclusion of the audit.</strong> Only box–box margin contacts are unreliable, in both directions. Every other pair type,
+and <code>mj_geomDistance</code> for every pair type, matched certified distances on every audited pose.</p>
+
+<h2 id="s-fix">The fix</h2>
+<p>Three designs were considered: (a) replace <code>mj_collision</code> with <code>mj_geomDistance</code> for all ~150–180 robot–environment
+pairs (correct but about 250–480 µs per check instead of ~25 µs); (b) turn the fingertip boxes into box-shaped meshes in the
+checker's model (rejected: needs recompiling, and the checker should see the plant's exact geometry); (c) <strong>keep
+<code>mj_collision</code> for everything except box–box robot/obstacle pairs, ignore MuJoCo's contacts for those, and query
+<code>mj_geomDistance</code> for the ones a conservative bound cannot rule out</strong>. Option (c) was implemented.</p>
+<div class="box verified"><span class="lbl">Verified in source code (v0.5.2)</span>
+<ul>
+<li><code>CollisionChecker(..., exact_box_box=True)</code>; config key <code>planning.exact_box_box: true</code> in the three planning
+configs; <code>false</code> restores v0.5 behaviour exactly (re-running the robustness planning in that mode reproduced all 30
+v0.5.1 path lengths).</li>
+<li><code>_box_box_pairs</code> (line 147) lists robot-box × environment-box pairs allowed by MuJoCo's filters: 10 finger boxes ×
+6 obstacle boxes in the demo scene. <code>_ex_skip</code> marks them so their MuJoCo contacts are ignored.</li>
+<li><code>_exact_distances(cap)</code> (line 220) queries <code>mj_geomDistance</code> only for pairs whose robot-box centre lies inside the
+obstacle's world-aligned bounding box grown by <code>cap</code> + the robot box's bounding radius.</li>
+<li><code>in_collision</code>, <code>check</code> and <code>min_distance</code> all include these exact answers.</li>
+</ul></div>
+<div class="box derived"><span class="lbl">Why the pre-filter is safe</span>
+<p>The obstacle box is contained in its axis-aligned bounding box (AABB). Every point of the robot box lies within its
+bounding radius $r$ of its centre $p$. If $p$ lies outside the AABB grown by $c + r$ along some axis, then $p$ is at least
+$c + r$ from the AABB in that coordinate, hence at least $c + r$ from the obstacle, and every point of the robot box is at
+least $c$ from the obstacle. So skipped pairs are provably at least the clearance apart; the filter can cause extra queries
+but never a missed violation.</p></div>
+
+<h2 id="s-valid">Validation of the fix</h2>
+<ul>
+<li><strong>Tests</strong> (<span class="file">tests/test_clearance.py</span>, 12 tests): a Panda configuration whose right fingertip is
+17.8 mm from the wall (all other pairs ≥ 20.4 mm) is accepted by v0.5 and rejected by v0.5.2; a pad at 20.5 mm is accepted by
+v0.5.2 (v0.5 rejected it: a false alarm); a pad 3 mm inside the wall and one 2.8 mm inside the table are rejected by both;
+isolated pad–table (2.13 mm) and pad–wall (2.30 mm) near misses produce no MuJoCo contact but are rejected by the checker;
+500 configurations jittered around wall plans agree with exhaustive <code>mj_geomDistance</code> on every one; the lever-arm bound
+holds for every collision vertex of the Panda on random edges; planned paths keep ≥ 20 mm at samples and ≥ 15 mm densely.</li>
+<li><strong>The v0.5.1 expected failure</strong> asserted that <em>raw MuJoCo</em> generates the contact, which remains false in MuJoCo 3.16.
+It was resolved by moving the assertion to the checker (<code>test_checker_rejects_box_box_near_miss_inside_the_margin</code>,
+passes) and pinning the MuJoCo behaviour as an ordinary test (<code>test_mujoco_box_box_still_misses_this_margin_contact</code>),
+which will fail, deliberately, if a MuJoCo upgrade changes it.</li>
+<li><strong>Whole-robot exposure.</strong> On the full robot the finger meshes, which MuJoCo checks correctly, sit right behind the pads,
+so the practical exposure of v0.5 was small: local search found it accepting at worst 17.8 mm (2.2 mm inside the clearance)
+and nothing below 20 mm at the table. On 44,616 configurations the planner actually evaluated, v0.5 made 91 false alarms and
+0 false "safe" answers. Still, with the v0.5 checker 3 of 113 benchmark plans had exact clearance below 20 mm (worst
+18.54 mm); with v0.5.2, 0.</li>
+</ul>
+
+<h2 id="s-perf">Performance trade-offs</h2>
+<div class="box measured"><span class="lbl">Reported results (v0.5.2 report §6.1–6.2)</span>
+<p>Per configuration on the wall planner's workload: <code>mj_collision</code> alone 25 µs, v0.5 checker 33 µs, v0.5.2 58 µs,
+v0.5.2 without the filter (all 60 box-box pairs queried) 99 µs, exhaustive <code>mj_geomDistance</code> over all pairs 206 µs.
+The filter removed more than 99.9% of the <code>mj_geomDistance</code> calls (0.04 per configuration instead of 59). The remaining
+overhead is the filter's NumPy call overhead. Median planning time rose by 6–46% in the obstacle scenes (wall 0.184 →
+0.270 s); success rates were unchanged in all 11 scenarios.</p></div>
+
+<h2 id="s-mvg">Measured clearance versus guaranteed clearance</h2>
+<table id="tab-mvg">
+<caption>Three different statements about distance, often confused.</caption>
+<thead><tr><th>Statement</th><th>Kind</th><th>Value (v0.5.2)</th><th>Holds under</th></tr></thead>
+<tbody>
+<tr><td>Every configuration the checker accepted is ≥ 20 mm from the environment</td><td>per-sample check</td><td>20 mm</td><td>exactness of MuJoCo's queries (audited, not proven)</td></tr>
+<tr><td>Every configuration on an accepted edge is ≥ 15 mm away</td><td>mathematical deduction</td><td>15 mm</td><td>assumptions (1)–(5) above</td></tr>
+<tr><td>The planned paths actually stayed ≥ 19.998 mm away (dense sampling every 1 mm of motion)</td><td>measurement</td><td>19.998 mm worst; max drop between samples 0.07 mm</td><td>the 113 benchmark plans measured</td></tr>
+<tr><td>The executed robot stayed ≥ 20.0 mm away</td><td>measurement of execution</td><td>20.01 mm worst over 60 robustness executions</td><td>those executions, exact model, no disturbance</td></tr>
+</tbody></table>
+<div class="box warning"><span class="lbl">Limitations</span>
+<ul><li>No continuous collision detection; the 15 mm figure is a deduction with assumptions, not a measured guarantee.</li>
+<li>Self-collision is discrete (samples only), including box–box pad–pad self pairs, which still use MuJoCo's routine (fine at
+margin 0, where penetration is always detected).</li>
+<li>The audit covers the shape types in these scenes. New shapes (capsules, ellipsoids, non-convex meshes) need it re-run.</li>
+<li>Everything refers to MuJoCo's collision geometry, not to the real robot's surfaces.</li></ul></div>

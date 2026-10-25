@@ -1,0 +1,157 @@
+<div class="part">Part IV — Planning and Trajectories<small>Finding collision-free routes, proving they keep their distance, and turning routes into motions the controllers can follow.</small></div>
+
+<h1 class="chapter" id="ch-plan">Robot motion planning</h1>
+
+<p class="chapter-intro">When the straight motion to a goal would hit something, the robot needs a different route. This chapter explains configuration space, why sampling-based planners are used for arms, how RRT-Connect works, and exactly how our planner is implemented.</p>
+
+<h2 id="s-cspace">Configuration space</h2>
+<p><strong>Intuition.</strong> Planning for an arm is hard in the physical world because the arm is a large, oddly
+shaped, moving object. The trick is to change viewpoint: describe the robot by a single point, its configuration
+$q$, in the space of all joint-angle combinations, the <strong>configuration space</strong> or <strong>C-space</strong>. For the
+Panda arm, C-space is a 7-dimensional box (the joint limits). Every point in it is one complete arm posture.</p>
+<p><strong>Obstacles in C-space.</strong> A configuration is in collision if the arm at that posture overlaps an obstacle (or
+itself). The set of such configurations is the <strong>C-obstacle</strong>. A small box on the table becomes a large,
+curved region in C-space, because many joint combinations sweep some link through it. Planning becomes: find a
+continuous curve from $q_{\text{start}}$ to $q_{\text{goal}}$ that stays in the free part of C-space,
+$\mathcal{C}_{\text{free}}$.</p>
+<figure id="fig-cspace"><img src="../figures/fig_cspace.svg" alt="cspace">
+<figcaption>Configuration space of a planar two-link arm with one round obstacle (illustration computed by
+<span class="file">make_figures.py</span>). Left: two postures in the workspace. Right: each pixel is one
+$(\theta_1, \theta_2)$; red pixels are postures that touch the obstacle. The straight C-space line between $q_A$ and
+$q_B$ (dashed) crosses the C-obstacle, so the straight joint motion would collide, although both end postures are free.</figcaption></figure>
+<p>The Panda's C-space has 7 dimensions, so we cannot draw it, and we never compute the C-obstacle explicitly. We only
+have a <em>membership test</em>: for any given $q$, the collision checker says whether it is free (Chapter 11).</p>
+
+<h2 id="s-search">Graph search versus sampling-based planning</h2>
+<p>The classical approach discretizes C-space into a grid and runs a graph search (Dijkstra, A*) from start to goal.
+It finds the shortest grid path if one exists, but the number of cells grows exponentially with dimension: 100
+cells per joint gives $100^7 = 10^{14}$ cells for the Panda, far beyond any memory. This "curse of dimensionality"
+is why arm planners are <strong>sampling-based</strong>: they draw random configurations, keep the free ones, and connect
+nearby ones with checked straight edges, exploring the free space without ever representing it fully.
+Sampling-based planners are <strong>probabilistically complete</strong>: if a path exists, the probability of finding it
+approaches 1 as the number of samples grows, but a failure after a finite budget does not prove that no path exists.</p>
+
+<h2 id="s-rrt">Rapidly-exploring random trees</h2>
+<p>An RRT grows a tree from the start. Each iteration: draw a random configuration $q_{\text{rand}}$; find the tree
+node $q_{\text{near}}$ closest to it; take a step of length at most $\delta$ from $q_{\text{near}}$ towards
+$q_{\text{rand}}$, giving $q_{\text{new}}$; if $q_{\text{new}}$ and the edge to it are collision-free, add it to the
+tree. Because large unexplored regions are more likely to contain the random sample, the tree is pulled towards them
+(the "Voronoi bias"), and it spreads rapidly through the free space.</p>
+
+<h2 id="s-rrtc">RRT-Connect: bidirectional growth</h2>
+<p>RRT-Connect (Kuffner and LaValle, 2000) grows <strong>two</strong> trees, one from the start and one from the goal, and
+tries greedily to join them:</p>
+<pre class="src" data-src="pseudocode mirroring planning/rrt_connect.py, RRTConnect.plan (lines 146–210)">if start or goal invalid:             return INVALID_START / INVALID_GOAL
+if edge(start, goal) is valid:        return [start, goal]           # try_direct
+Ta = tree(start); Tb = tree(goal)
+while iterations, nodes and time remain:
+    q_rand = uniform sample in the joint box (limits minus 0.05 rad)
+    status, q_new = EXTEND(Ta, q_rand)            # one step of size <= 0.3 towards q_rand
+    if status != TRAPPED:
+        repeat: status_b = EXTEND(Tb, q_new)      # CONNECT: keep stepping towards q_new
+        until status_b != ADVANCED
+        if status_b == REACHED:                   # the trees touch at q_new
+            return path(start ... q_new ... goal) # walk both trees back to their roots
+    swap(Ta, Tb)
+return TIMEOUT / NODE_BUDGET / NO_PATH
+
+EXTEND(T, q):  q_near = nearest node of T (weighted metric)
+               q_new  = q if d(q_near, q) <= step else q_near + step * (q - q_near)/d
+               if in_collision(q_new) or not edge_valid(q_near, q_new): return TRAPPED
+               add q_new with parent q_near; return REACHED if q_new == q else ADVANCED</pre>
+<p><strong>Path reconstruction.</strong> Every node stores its parent's index (<code>_Tree.parent</code>). When the trees meet at
+a common configuration, following parent links from that node back to each root and joining the two branches
+gives the path: a list of configurations from start to goal, every consecutive pair joined by an edge that was
+checked when it was added.</p>
+<figure id="fig-rrt"><img class="w60" src="../figures/fig_rrt.svg" alt="rrt">
+<figcaption>RRT-Connect in a 2-D toy world (illustration computed by <span class="file">make_figures.py</span> with the same
+EXTEND/CONNECT logic and the greedy pruning pass of <span class="file">planning/shortcut.py</span>). Green: tree from the
+start; blue: tree from the goal; orange: the raw path when the trees connect; black: after pruning.</figcaption></figure>
+
+<h2 id="s-ourplanner">Our implementation in detail</h2>
+<div class="box verified"><span class="lbl">Verified in source code</span>
+<ul>
+<li><strong>Metric.</strong> Distances are weighted, $d(a,b) = \|W(a-b)\|$ with $W = \mathrm{diag}(w)$ and
+$w_j = \max(R_j/R_1, 0.2)$, where $R_j$ is joint $j$'s lever arm (<code>CollisionChecker.lever_arms</code>,
+Chapter 11): $R$ = [1.149, 1.149, 0.833, 0.751, 0.358, 0.358, 0.270] m, so
+$w$ = [1, 1, 0.725, 0.653, 0.311, 0.311, 0.235]. A radian at the shoulder sweeps the arm much further than a radian of
+wrist roll, and the metric reflects that (<span class="file">rrt_connect.py</span>, lines 98–107).</li>
+<li><strong>Step size</strong> 0.3 in this metric, roughly 0.3 rad of shoulder motion (<code>RRTSettings.step_size</code>).</li>
+<li><strong>Nearest neighbour</strong>: a vectorized linear scan over preallocated arrays (<code>_Tree.nearest</code>), no k-d tree.</li>
+<li><strong>Budgets</strong>: wall-clock time (5 s), total nodes in both trees (20,000) and iterations (20,000); each ends with its own
+status: <code>timeout</code>, <code>node_budget</code>, <code>no_path</code>.</li>
+<li><strong>Determinism</strong>: <code>np.random.default_rng(seed)</code>; the same seed gives the same path unless the time budget
+ends the run (<code>test_rrt_is_deterministic_for_a_seed</code>).</li>
+<li><strong>Seeds per query</strong>: <code>MotionPlanner._next_seed</code> gives the n-th query of a planner seed
+<code>settings.seed + 1000·(n−1)</code>: 0 for the demo's first target, 1000 for the second.</li>
+</ul></div>
+
+<h2 id="s-ikpost">Planning to a hand position: multiple IK postures</h2>
+<p>A Cartesian target has a 4-D family of joint solutions. Picking one posture and planning to it can fail even when
+another posture would be easy to reach. <code>plan_to_position</code> (<span class="file">motion_planner.py</span>, line 129)
+therefore:</p>
+<ol>
+<li>checks the start;</li>
+<li>calls <code>ik_candidates</code>: 22 IK seeds (current, rest, 8 local perturbations with σ = 0.5 rad, 12 uniform random), keeps
+converged <em>and</em> collision-free solutions, de-duplicates them, sorts them by weighted distance from the start, keeps up to 4;</li>
+<li>reports <code>unreachable</code> if no seed converges and <code>no_valid_ik</code> if all converged postures are invalid;</li>
+<li>tries RRT-Connect to each candidate in order, giving each a fair share of the remaining time budget (unused time
+carries over), and returns the first success after shortcutting.</li>
+</ol>
+<div class="box measured"><span class="lbl">Reported result (v0.5 report §4)</span>
+<p>In the narrow-passage scene (wall under a ceiling), with only random IK seeds, 8 of 20 seeds failed: every valid
+posture found had the shoulder leaned back and timed out even with 20 s. Adding seeds perturbed around the current
+posture fixed it (20/20). The failures came from <em>posture selection</em>, not from RRT. In
+<code>multi_ik_near_obstacle</code> the v0.4 IK-only planner accepts a posture 17 mm from an obstacle; the planner rejects
+it on clearance and reaches the target with another posture (20/20).</p></div>
+
+<h2 id="s-smooth">Path smoothing</h2>
+<p>RRT paths zig-zag, because every edge points towards a random sample. <code>shortcut</code>
+(<span class="file">planning/shortcut.py</span>) shortens them in two passes, keeping every edge collision-checked:</p>
+<ol>
+<li><strong>Greedy pruning</strong> (<code>prune</code>): from each kept vertex, jump to the farthest later vertex reachable by a valid
+straight edge.</li>
+<li><strong>Random shortcuts</strong> (100 seeded iterations): pick two points uniformly along the path, possibly inside edges; if
+the straight edge between them is valid <em>and</em> the new vertices and the shortened partial edges re-check as
+valid, splice it in. Then prune again and re-validate the whole path; if re-validation ever fails, return the
+original path unchanged.</li>
+</ol>
+<p>There is no spline smoothing: the output is a polyline whose edges are exactly the straight joint segments the
+trajectory will execute, so nothing un-checked is ever executed.</p>
+<div class="box warning"><span class="lbl">Two bugs found and fixed in v0.5 (v0.5 report §5)</span>
+<p>(1) Shortcuts were accepted using the <em>weighted</em> length while the <em>unweighted</em> length was reported: trading shoulder
+motion for wrist motion lowered one and raised the other, so "optimized" paths got longer with more iterations
+(1.49 rad at 50 iterations, 2.37 rad at 800). (2) A point on a validated edge is only certified to 15 mm, not
+20 mm (Chapter 11), so new vertices failed final re-validation and long runs fell back to the raw path. After the
+fixes: 1.47 rad at 50, 1.45 at 100, 1.40 at 400 iterations.</p></div>
+
+<h2 id="s-planex">An illustrated example: reaching over the wall</h2>
+<figure id="fig-demopaths"><img class="w80" src="../figures/repo_v05_demo_paths.png" alt="demo paths">
+<figcaption>The wall demo's planned hand paths (from <span class="file">docs/research/figures/v0.5_demo_paths.png</span>):
+the blocked straight joint motion, the raw RRT-Connect path and the shortcut path that is executed.</figcaption></figure>
+<p>For the first demo target (Chapter 3), the direct joint edge is blocked: the hand would sweep through the wall.
+RRT-Connect connected the trees with 21 nodes; the raw path covered 4.39 rad of joint motion; shortcutting reduced
+it to 1.41 rad with two via points. The resulting hand path rises over the wall and comes down on the other side.</p>
+<div class="box measured"><span class="lbl">Reported results (v0.5.2 planning benchmark, docs/research/v0.5.2-planning-summary.csv)</span>
+<table class="small"><thead><tr><th>scenario</th><th>success</th><th>median time (s)</th><th>nodes</th><th>collision checks</th><th>raw → smoothed (rad)</th></tr></thead>
+<tbody>
+<tr><td>easy_free (direct edge free)</td><td>20/20</td><td class="num">0.083</td><td class="num">2</td><td class="num">65</td><td>0.33 → 0.33</td></tr>
+<tr><td>wall</td><td>20/20</td><td class="num">0.270</td><td class="num">17</td><td class="num">4,382</td><td>3.70 → 1.55</td></tr>
+<tr><td>obstacles_blocked</td><td>20/20</td><td class="num">0.195</td><td class="num">11</td><td class="num">3,201</td><td>3.02 → 1.15</td></tr>
+<tr><td>narrow_passage</td><td>20/20</td><td class="num">0.655</td><td class="num">92</td><td class="num">13,655</td><td>10.27 → 5.59</td></tr>
+<tr><td>narrow_random_ik_only</td><td>12/20</td><td class="num">0.668</td><td class="num">216</td><td class="num">21,954</td><td>10.31 → 5.97</td></tr>
+<tr><td>timeout (5 ms budget)</td><td>0/20</td><td class="num">0.006</td><td class="num">4</td><td class="num">137</td><td>—</td></tr>
+</tbody></table>
+<p>20 seeds per scenario. Times are Python wall-clock times on a laptop with ±25–30% run-to-run noise. Failure
+scenarios fail for their documented reasons: unreachable (IK), start in collision, goal in collision, timeout, node budget.</p></div>
+
+<h2 id="s-planlim">Limitations</h2>
+<ul>
+<li><strong>Not optimal.</strong> RRT-Connect plus shortcutting finds <em>a</em> path, not the shortest; lengths vary up to about 2× across
+seeds (thicker wall: 1.16–2.36 rad in v0.5.1). Optimal variants (RRT*, BIT*) are not implemented.</li>
+<li><strong>Static, known world.</strong> Obstacles are read from the model, known exactly, and assumed fixed during motion. Planning
+happens once, before motion; there is no replanning during execution.</li>
+<li><strong>Probabilistic completeness only.</strong> <code>timeout</code>, <code>node_budget</code> and <code>no_path</code> never prove that no path exists.</li>
+<li><strong>Rest-to-rest via points.</strong> The arm stops at every via point, which makes motions slower than a blended trajectory.</li>
+<li><strong>Position-only goals.</strong> Hand orientation at the goal is not planned; the gripper stays at its current opening.</li>
+</ul>

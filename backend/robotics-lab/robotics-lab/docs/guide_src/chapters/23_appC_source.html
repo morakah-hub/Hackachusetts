@@ -1,0 +1,84 @@
+<h1 class="appendix" id="app-src">Source-code reference</h1>
+<p>Concepts mapped to files, classes and functions with line ranges at commit 5dbeffd (computed with Python's <code>ast</code> module;
+line ranges cover the whole function).</p>
+
+<table class="small" id="tab-src-sim">
+<caption>Entry point, robot, engine and runner.</caption>
+<thead><tr><th>Concept</th><th>File</th><th>Function / class</th><th class="num">Lines</th></tr></thead>
+<tbody>
+<tr><td>Command-line interface, headless summary</td><td>main.py</td><td><code>main</code></td><td class="num">23–146</td></tr>
+<tr><td>Load Menagerie model, add EE site</td><td>robots/panda.py</td><td><code>Panda.load_spec</code></td><td class="num">75–89</td></tr>
+<tr><td>Position servos → torque motors</td><td>robots/panda.py</td><td><code>Panda._make_torque_actuators</code></td><td class="num">91–107</td></tr>
+<tr><td>Obstacle geometry overrides</td><td>simulation/engine.py</td><td><code>apply_overrides</code></td><td class="num">30–50</td></tr>
+<tr><td>Attach robot to scene; base–table exclusion</td><td>simulation/engine.py</td><td><code>build_spec</code></td><td class="num">53–69</td></tr>
+<tr><td>Model compile, index arrays, controller model</td><td>simulation/engine.py</td><td><code>SimulationEngine.__init__</code></td><td class="num">75–106</td></tr>
+<tr><td>Only place qpos is written</td><td>simulation/engine.py</td><td><code>SimulationEngine.reset</code></td><td class="num">116–130</td></tr>
+<tr><td>Command clipping</td><td>simulation/engine.py</td><td><code>SimulationEngine.set_arm_command</code></td><td class="num">144–148</td></tr>
+<tr><td>Model-mismatch copy</td><td>simulation/engine.py</td><td><code>SimulationEngine.perturbed_model</code></td><td class="num">175–184</td></tr>
+<tr><td>YAML with <code>extends:</code></td><td>simulation/runner.py</td><td><code>load_config</code></td><td class="num">76–89</td></tr>
+<tr><td>Observer / CTC / torque-MPC construction</td><td>simulation/runner.py</td><td><code>build_observer</code>, <code>build_ctc</code>, <code>build_torque_mpc</code></td><td class="num">135–190</td></tr>
+<tr><td>Controller factory</td><td>simulation/runner.py</td><td><code>build_controller</code></td><td class="num">193–204</td></tr>
+<tr><td>Runner set-up</td><td>simulation/runner.py</td><td><code>SimulationRunner.__init__</code></td><td class="num">224–253</td></tr>
+<tr><td>Trajectory limits from config</td><td>simulation/runner.py</td><td><code>SimulationRunner.trajectory_options</code></td><td class="num">263–285</td></tr>
+<tr><td>Task (and planner) construction</td><td>simulation/runner.py</td><td><code>SimulationRunner._build_task</code></td><td class="num">291–352</td></tr>
+<tr><td>One control + physics step</td><td>simulation/runner.py</td><td><code>SimulationRunner.step</code></td><td class="num">358–369</td></tr>
+<tr><td>Headless loop and log</td><td>simulation/runner.py</td><td><code>SimulationRunner.run_headless</code></td><td class="num">371–392</td></tr>
+<tr><td>Viewer, real-time pacing, thread join</td><td>simulation/runner.py</td><td><code>run_viewer</code>, <code>_viewer_loop</code></td><td class="num">394–440</td></tr>
+</tbody></table>
+
+<table class="small" id="tab-src-kin">
+<caption>Kinematics, dynamics and controllers.</caption>
+<thead><tr><th>Concept</th><th>File</th><th>Function / class</th><th class="num">Lines</th></tr></thead>
+<tbody>
+<tr><td>Orientation error angle</td><td>simulation/kinematics.py</td><td><code>rotation_angle</code></td><td class="num">30–38</td></tr>
+<tr><td>Forward kinematics</td><td>simulation/kinematics.py</td><td><code>ArmKinematics.fk</code></td><td class="num">79–82</td></tr>
+<tr><td>End-effector Jacobian</td><td>simulation/kinematics.py</td><td><code>ArmKinematics.jacobian</code></td><td class="num">90–96</td></tr>
+<tr><td>Damped-least-squares IK</td><td>simulation/kinematics.py</td><td><code>ArmKinematics.solve_ik</code></td><td class="num">118–141</td></tr>
+<tr><td>v0.3 IK + straight-path check</td><td>simulation/kinematics.py</td><td><code>plan_target</code>, <code>path_contacts</code></td><td class="num">110–163</td></tr>
+<tr><td>PID outer loop</td><td>controllers/pid.py</td><td><code>JointPIDController.compute</code></td><td class="num">45–56</td></tr>
+<tr><td>Inverse dynamics (mj_inverse)</td><td>controllers/dynamics.py</td><td><code>ArmInverseDynamics.torque</code></td><td class="num">33–40</td></tr>
+<tr><td>Computed-torque law</td><td>controllers/computed_torque.py</td><td><code>ComputedTorqueController.compute</code></td><td class="num">66–81</td></tr>
+<tr><td>Disturbance observer</td><td>controllers/disturbance.py</td><td><code>JointDisturbanceObserver.update</code></td><td class="num">67–79</td></tr>
+<tr><td>Copy live state to scratch</td><td>controllers/prediction.py</td><td><code>MuJoCoPredictionModel._load</code></td><td class="num">216–225</td></tr>
+<tr><td>Affine model A, B, c</td><td>controllers/prediction.py</td><td><code>MuJoCoPredictionModel.linearize</code></td><td class="num">245–268</td></tr>
+<tr><td>mjd_transitionFD + composition</td><td>controllers/prediction.py</td><td><code>_jacobians_power</code></td><td class="num">270–286</td></tr>
+<tr><td>Plausibility check</td><td>controllers/prediction.py</td><td><code>jacobians_plausible</code></td><td class="num">124–129</td></tr>
+<tr><td>Gravity torque</td><td>controllers/prediction.py</td><td><code>gravity_torque</code></td><td class="num">306–311</td></tr>
+<tr><td>Servo MPC update / QP data</td><td>controllers/mpc.py</td><td><code>JointMPCController._update</code>, <code>_qp_data</code></td><td class="num">409–534</td></tr>
+<tr><td>MPC statistics summary</td><td>controllers/mpc.py</td><td><code>MPCStats.summary</code></td><td class="num">121–142</td></tr>
+<tr><td>Torque MPC set-up, settings</td><td>controllers/torque_mpc.py</td><td><code>TorqueMPCController.__init__</code></td><td class="num">83–135</td></tr>
+<tr><td>QP structure: cost and constraint pattern</td><td>controllers/torque_mpc.py</td><td><code>_build_structure</code></td><td class="num">145–237</td></tr>
+<tr><td>Per-step logic, hold, feedthrough</td><td>controllers/torque_mpc.py</td><td><code>compute</code></td><td class="num">264–282</td></tr>
+<tr><td>Reference preview</td><td>controllers/torque_mpc.py</td><td><code>_references</code></td><td class="num">284–293</td></tr>
+<tr><td>Linearize, fill QP, solve, fallback</td><td>controllers/torque_mpc.py</td><td><code>_update</code></td><td class="num">295–370</td></tr>
+<tr><td>Warm start shift</td><td>controllers/torque_mpc.py</td><td><code>_shifted</code></td><td class="num">372–379</td></tr>
+</tbody></table>
+
+<table class="small" id="tab-src-tasks">
+<caption>Tasks, trajectories, planning and experiments.</caption>
+<thead><tr><th>Concept</th><th>File</th><th>Function / class</th><th class="num">Lines</th></tr></thead>
+<tbody>
+<tr><td>Waypoint task construction / reference</td><td>tasks/joint_target.py</td><td><code>JointTargetTask.__init__</code>, <code>reference</code></td><td class="num">50–143</td></tr>
+<tr><td>Quintic timing law</td><td>tasks/trajectory.py</td><td><code>quintic</code></td><td class="num">77–87</td></tr>
+<tr><td>Double-S profile</td><td>tasks/trajectory.py</td><td><code>DoubleS.__init__</code></td><td class="num">93–124</td></tr>
+<tr><td>Time scaling and torque check</td><td>tasks/trajectory.py</td><td><code>plan_segment</code></td><td class="num">189–286</td></tr>
+<tr><td>Reference feasibility report</td><td>tasks/trajectory.py</td><td><code>check_reference</code></td><td class="num">301–341</td></tr>
+<tr><td>Cartesian targets → via points</td><td>tasks/reach.py</td><td><code>CartesianReachTask.__init__</code></td><td class="num">41–93</td></tr>
+<tr><td>Joint waypoints via planned paths</td><td>tasks/planned_joint.py</td><td><code>PlannedJointTask.__init__</code></td><td class="num">24–76</td></tr>
+<tr><td>Checker set-up: margins, midphase off, exact pairs</td><td>planning/collision.py</td><td><code>CollisionChecker.__init__</code></td><td class="num">81–138</td></tr>
+<tr><td>Box-box pair list</td><td>planning/collision.py</td><td><code>_box_box_pairs</code></td><td class="num">147–162</td></tr>
+<tr><td>Lever arms</td><td>planning/collision.py</td><td><code>_lever_arms</code></td><td class="num">166–194</td></tr>
+<tr><td>Edge sample count</td><td>planning/collision.py</td><td><code>edge_samples</code></td><td class="num">200–204</td></tr>
+<tr><td>Configuration collision query</td><td>planning/collision.py</td><td><code>_collide</code></td><td class="num">212–218</td></tr>
+<tr><td>Exact box-box distances + filter</td><td>planning/collision.py</td><td><code>_exact_distances</code></td><td class="num">220–247</td></tr>
+<tr><td>Validity report, minimum distance</td><td>planning/collision.py</td><td><code>check</code>, <code>min_distance</code></td><td class="num">273–305</td></tr>
+<tr><td>Edge and path validity</td><td>planning/collision.py</td><td><code>edge_valid</code>, <code>path_valid</code>, <code>_coarse_to_fine</code></td><td class="num">309–365</td></tr>
+<tr><td>RRT-Connect EXTEND / CONNECT / plan</td><td>planning/rrt_connect.py</td><td><code>_extend</code>, <code>_connect</code>, <code>plan</code></td><td class="num">120–210</td></tr>
+<tr><td>Pruning and shortcutting</td><td>planning/shortcut.py</td><td><code>prune</code>, <code>shortcut</code></td><td class="num">45–106</td></tr>
+<tr><td>Multiple IK postures</td><td>planning/ik.py</td><td><code>ik_candidates</code></td><td class="num">43–86</td></tr>
+<tr><td>Planner settings from YAML</td><td>planning/motion_planner.py</td><td><code>PlanningSettings.from_config</code></td><td class="num">49–63</td></tr>
+<tr><td>Joint and Cartesian planning</td><td>planning/motion_planner.py</td><td><code>plan_joint</code>, <code>plan_to_position</code></td><td class="num">116–186</td></tr>
+<tr><td>Exact clearance metric</td><td>simulation/robustness.py</td><td><code>ExactClearance</code></td><td class="num">47–100</td></tr>
+<tr><td>Wall-variant episode</td><td>simulation/robustness.py</td><td><code>plan_episode</code></td><td class="num">136–163</td></tr>
+<tr><td>Controller benchmark metrics</td><td>simulation/benchmark.py</td><td><code>run_case</code></td><td class="num">112–256</td></tr>
+</tbody></table>

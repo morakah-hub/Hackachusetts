@@ -1,0 +1,63 @@
+<h1 class="appendix" id="app-run">Running the project</h1>
+<p>All commands are for Windows PowerShell from the repository root, calling the virtual environment's Python directly. The status
+column distinguishes commands that were <strong>run</strong> on commit 5dbeffd (during the v0.5.2 milestone or while preparing this
+guide, 19 Oct 2026) from commands that are only <strong>code-verified</strong>: the options exist in the argument parser and the code path
+was read, but the command was not executed for this guide.</p>
+
+<h2 id="s-d-setup">Set-up</h2>
+<pre>py -3.13 -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt     # mujoco 3.16.0, numpy, scipy, osqp, PyYAML, pytest, matplotlib</pre>
+<p>Status: from the README; the environment used here already existed (not re-created for this guide).</p>
+
+<h2 id="s-d-sim">Simulations</h2>
+<table class="small" id="tab-run-sim">
+<caption>Simulation commands.</caption>
+<thead><tr><th>Command</th><th>What it does</th><th>Status</th></tr></thead>
+<tbody>
+<tr><td><code>.\.venv\Scripts\python.exe main.py --config configs\planning_demo.yaml --headless</code></td><td>wall demo, planning on, torque MPC; prints the summary of Chapter 3</td><td><strong>run</strong></td></tr>
+<tr><td><code>.\.venv\Scripts\python.exe main.py --config configs\planning_demo.yaml</code></td><td>same, in MuJoCo's viewer with planned paths drawn</td><td>code-verified</td></tr>
+<tr><td><code>... main.py --config configs\planning_demo.yaml --no-planning</code></td><td>planning off: blocked target rejected</td><td>code-verified (run in v0.5 report)</td></tr>
+<tr><td><code>... main.py --config configs\planning_demo.yaml --no-planning --unchecked-direct</code></td><td>UNSAFE comparison: drives into the wall</td><td>code-verified (run in v0.5 report)</td></tr>
+<tr><td><code>... main.py</code></td><td>default: table, three waypoints, PID, viewer</td><td>code-verified</td></tr>
+<tr><td><code>... main.py --controller torque_mpc</code> (or <code>pid</code>, <code>mpc</code>, <code>ctc</code>)</td><td>change controller; the engine switches actuator model automatically</td><td>code-verified</td></tr>
+<tr><td><code>... main.py --headless --duration 12</code></td><td>no viewer, 12 simulated seconds</td><td>code-verified</td></tr>
+<tr><td><code>... main.py --config configs\reach.yaml --controller torque_mpc</code></td><td>Cartesian reaching, 2 targets rejected with reasons</td><td>code-verified</td></tr>
+<tr><td><code>... main.py --target 0.5 0.2 0.7</code></td><td>reach an ad-hoc point (repeatable option)</td><td>code-verified</td></tr>
+<tr><td><code>... main.py --config configs\planning_demo.yaml --plan-seed 3</code></td><td>different random planning seed</td><td>code-verified</td></tr>
+</tbody></table>
+
+<h2 id="s-d-video">Video</h2>
+<pre>.\.venv\Scripts\python.exe tools\render_demo_video.py          # -> results\video\v0.5.2_demo.webp, ~2 min      [run]
+.\.venv\Scripts\python.exe tools\render_demo_video.py --include-unsafe --output results\video\with_unsafe.webp   [code-verified]</pre>
+<p>The renderer refuses to overwrite an existing file unless <code>--overwrite</code> is given, so the historical
+<code>results\video\v0.5.1_demo.webp</code> is protected. Output is an animated WebP (plays in a browser).</p>
+
+<h2 id="s-d-tests">Tests</h2>
+<pre>.\.venv\Scripts\python.exe -m pytest tests -q                      # 189 tests, ~2–3 min     [run: 189 passed]
+.\.venv\Scripts\python.exe -m pytest tests\test_clearance.py -v    # v0.5.2 tests            [run]</pre>
+
+<h2 id="s-d-bench">Benchmarks and experiments</h2>
+<table class="small" id="tab-run-bench">
+<caption>Experiment commands (outputs go to the git-ignored <code>results\</code>).</caption>
+<thead><tr><th>Command</th><th>Reproduces</th><th>Status</th></tr></thead>
+<tbody>
+<tr><td><code>... planning_benchmark.py --no-execution --no-plots --output results\v0.5.2_planning</code></td><td>planning part of E6</td><td><strong>run</strong></td></tr>
+<tr><td><code>... planning_benchmark.py --execution-only --scenarios wall --output results\v0.5.2_exec_wall</code> (also <code>easy_free</code>, <code>obstacles_blocked</code>, <code>narrow_passage</code>)</td><td>execution part of E6</td><td><strong>run</strong></td></tr>
+<tr><td><code>... robustness_experiment.py --output results\robustness_v052</code></td><td>E8 (30 episodes, 60 executions)</td><td><strong>run</strong></td></tr>
+<tr><td><code>... robustness_experiment.py --no-execution</code></td><td>planning and old-plan checks only</td><td><strong>run</strong> (with a v0.5-mode config)</td></tr>
+<tr><td><code>... tools\audit_clearance.py</code></td><td>E9 audit (11 pair types × 4,000 poses, ~7 min)</td><td><strong>run</strong></td></tr>
+<tr><td><code>... tools\profile_collision.py --seeds 10 --output results\v0.5.2_profile</code></td><td>E10</td><td><strong>run</strong></td></tr>
+<tr><td><code>... benchmark.py</code></td><td>E1 controller benchmark (~12–15 min)</td><td>code-verified</td></tr>
+<tr><td><code>... benchmark.py --config configs\benchmark_robustness.yaml</code></td><td>E3 robustness sweep</td><td>code-verified</td></tr>
+<tr><td><code>... benchmark.py --controllers pid torque_mpc --scenarios demo push</code></td><td>a subset of E1</td><td>code-verified</td></tr>
+<tr><td><code>... tools\diagnose_torque_mpc.py</code>, <code>tools\profile_mpc.py</code></td><td>E2, E4</td><td>code-verified</td></tr>
+</tbody></table>
+<p>For "before/after" comparisons of the collision checker, copy a planning config, set <code>exact_box_box: false</code>, and pass it with
+<code>--config</code> (for <code>planning_demo.yaml</code>, also point <code>extends:</code> at <code>configs\default.yaml</code>).</p>
+
+<h2 id="s-d-guide">Rebuilding this guide</h2>
+<pre>.\.venv\Scripts\python.exe docs\guide_src\make_figures.py      # computed figures (fast)            [run]
+.\.venv\Scripts\python.exe docs\guide_src\build_guide.py       # HTML -> PDF via headless Chrome    [run]</pre>
+<p>The build needs Chrome or Edge and the <code>websockets</code> package (already in the venv). <code>pypdf</code> is optional (it fills the
+page numbers in the table of contents); it is not in <code>requirements.txt</code>. MathJax is vendored in
+<span class="file">docs/guide_src/vendor/</span>, so no network access is needed.</p>

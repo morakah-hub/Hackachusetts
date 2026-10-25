@@ -1,0 +1,246 @@
+<h1 class="chapter" id="ch-trace">What happens when you run main.py?</h1>
+
+<p class="chapter-intro">A complete trace of one run, from the command line to the final printout, with the file and function that does each step. We follow the most complete path through the code: the wall-avoidance demo with torque MPC.</p>
+
+<p>The command traced in this chapter is</p>
+<pre>.\.venv\Scripts\python.exe main.py --config configs\planning_demo.yaml --headless</pre>
+<p>It reaches two Cartesian targets on either side of a wall with motion planning enabled, using the torque
+MPC controller, and prints a summary instead of opening the viewer. Its actual output on the documented
+commit (run on 19 Oct 2026, saved in <span class="file">results/v0.5.2_demo_headless.txt</span>) was:</p>
+<pre class="src" data-src="actual console output (abridged only by line wrapping)">Loaded 'planning_demo' environment: nq=9, nu=8, dt=0.002s, waypoints=['start', 'right_of_wall', 'back_left']
+Controller: TorqueMPCController (torque actuators)
+  target right_of_wall [0.45, -0.25, 0.5]: reachable
+    planned (direct edge BLOCKED -> RRT-Connect): 217 ms, 21 nodes, 3910 collision checks,
+            path 4.39 -> 1.41 rad, 4 vertices, seed 0
+  target back_left [0.45, 0.25, 0.5]: reachable
+    planned (direct edge BLOCKED -> RRT-Connect): 268 ms, 22 nodes, 5036 collision checks,
+            path 4.74 -> 1.19 rad, 4 vertices, seed 1000
+Simulated 9.00s (450 samples)
+Max |q - q_ref| tracking error: 0.0000 rad
+Final arm qpos: [0.3375, 0.5598, 0.1138, -1.8695, 0.1331, 1.8586, -0.7146]
+Final end-effector position: [0.45, 0.25, 0.5]
+Robot contacts at end: none
+Physics steps with robot contacts during the run: 0
+  right_of_wall: end-effector error at end of hold 0.02 mm
+  back_left: end-effector error at end of hold 0.05 mm
+MPC: updates=450, fallbacks=0, inaccurate=0, solve_time_mean_ms=3.85, solve_time_p95_ms=4.99, ...
+     update_time_mean_ms=4.86, update_time_max_ms=16.6, deadline_overruns=0, mean_iterations=37.7, ...</pre>
+<p>By the end of this chapter every line of that output should make sense. <a class="ref" href="#fig-flow"></a>
+summarizes the flow.</p>
+
+<figure id="fig-flow">
+<svg class="diagram" width="640" height="560" viewBox="0 0 640 560" xmlns="http://www.w3.org/2000/svg">
+<defs><marker id="a3" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#44505c"/></marker></defs>
+<g font-size="10">
+<text x="10" y="16" font-weight="700" fill="#b87414">SET-UP (once, before simulated time starts)</text>
+<g>
+<rect x="10" y="24" width="300" height="30" rx="4" fill="#fdf4e6" stroke="#b87414"/><text x="18" y="43">1–2  main.main(): argparse, load_config(extends), CLI overrides</text>
+<rect x="10" y="62" width="300" height="30" rx="4" fill="#f3f5f7" stroke="#56636f"/><text x="18" y="81">3–4  SimulationEngine: build_spec, Panda(torque), compile</text>
+<rect x="10" y="100" width="300" height="44" rx="4" fill="#e8f3ec" stroke="#3f8f5a"/><text x="18" y="117">5  _build_task: ArmKinematics, MotionPlanner.from_engine,</text><text x="18" y="132">    CartesianReachTask(targets, start, plan=…)</text>
+<rect x="10" y="152" width="300" height="44" rx="4" fill="#f6f0fb" stroke="#7a4fa3"/><text x="18" y="169">6–7  per target: plan_to_position → ik_candidates →</text><text x="18" y="184">    RRTConnect.plan → shortcut → MotionPlan(path)</text>
+<rect x="10" y="204" width="300" height="44" rx="4" fill="#e8f3ec" stroke="#3f8f5a"/><text x="18" y="221">8  path vertices → via points → JointTargetTask</text><text x="18" y="236">    plan_segment per edge (time scaling, torque check)</text>
+<rect x="10" y="256" width="300" height="44" rx="4" fill="#eaf1fa" stroke="#3a6ea8"/><text x="18" y="273">9  build_controller → build_torque_mpc: prediction model,</text><text x="18" y="288">    CTC fallback, disturbance observer, QP structure</text>
+<rect x="10" y="308" width="300" height="30" rx="4" fill="#f3f5f7" stroke="#56636f"/><text x="18" y="327">     runner.reset(): engine.reset(start q), gripper open</text>
+<line x1="160" y1="54" x2="160" y2="60" stroke="#44505c" marker-end="url(#a3)"/>
+<line x1="160" y1="92" x2="160" y2="98" stroke="#44505c" marker-end="url(#a3)"/>
+<line x1="160" y1="144" x2="160" y2="150" stroke="#44505c" marker-end="url(#a3)"/>
+<line x1="160" y1="196" x2="160" y2="202" stroke="#44505c" marker-end="url(#a3)"/>
+<line x1="160" y1="248" x2="160" y2="254" stroke="#44505c" marker-end="url(#a3)"/>
+<line x1="160" y1="300" x2="160" y2="306" stroke="#44505c" marker-end="url(#a3)"/>
+</g>
+<text x="340" y="16" font-weight="700" fill="#1f5f8b">LOOP (run_headless: 4500 steps for 9 s)</text>
+<rect x="335" y="24" width="295" height="330" rx="8" fill="none" stroke="#1f5f8b" stroke-dasharray="5 4"/>
+<rect x="350" y="40" width="265" height="30" rx="4" fill="#fdf4e6" stroke="#b87414"/><text x="358" y="59">before_step: count robot contacts (main.py)</text>
+<rect x="350" y="80" width="265" height="30" rx="4" fill="#e8f3ec" stroke="#3f8f5a"/><text x="358" y="99">ref = task.reference(t)  → q_ref, q̇_ref, q̈_ref</text>
+<rect x="350" y="120" width="265" height="30" rx="4" fill="#f3f5f7" stroke="#56636f"/><text x="358" y="139">13  measure q, q̇ = engine.arm_qpos/qvel()</text>
+<rect x="350" y="160" width="265" height="58" rx="4" fill="#eaf1fa" stroke="#3a6ea8"/><text x="358" y="177">10  controller.compute(): observer.update (every step)</text><text x="358" y="192">     every 10th step: _update → linearize, QP,</text><text x="358" y="207">     OSQP solve → τ held 20 ms (+ feedthrough)</text>
+<rect x="350" y="228" width="265" height="30" rx="4" fill="#f3f5f7" stroke="#56636f"/><text x="358" y="247">11  engine.set_arm_command(τ) (clip to ±87/±12 Nm)</text>
+<rect x="350" y="268" width="265" height="30" rx="4" fill="#f3f5f7" stroke="#56636f"/><text x="358" y="287">12  engine.step() → mujoco.mj_step (2 ms)</text>
+<rect x="350" y="308" width="265" height="30" rx="4" fill="#fdf4e6" stroke="#b87414"/><text x="358" y="327">15  every 10th step: append to RunLog</text>
+<line x1="482" y1="70" x2="482" y2="78" stroke="#44505c" marker-end="url(#a3)"/>
+<line x1="482" y1="110" x2="482" y2="118" stroke="#44505c" marker-end="url(#a3)"/>
+<line x1="482" y1="150" x2="482" y2="158" stroke="#44505c" marker-end="url(#a3)"/>
+<line x1="482" y1="218" x2="482" y2="226" stroke="#44505c" marker-end="url(#a3)"/>
+<line x1="482" y1="258" x2="482" y2="266" stroke="#44505c" marker-end="url(#a3)"/>
+<line x1="482" y1="298" x2="482" y2="306" stroke="#44505c" marker-end="url(#a3)"/>
+<path d="M615,323 L626,323 L626,55 L617,55" fill="none" stroke="#1f5f8b" marker-end="url(#a3)"/>
+<line x1="310" y1="323" x2="333" y2="200" stroke="#44505c" marker-end="url(#a3)"/>
+<text x="10" y="380" font-weight="700" fill="#b87414">AFTER THE LOOP</text>
+<rect x="10" y="388" width="620" height="44" rx="4" fill="#fdf4e6" stroke="#b87414"/><text x="18" y="405">14–15  main.py: max |q − q_ref| from the log, final pose, contacts, per-target end-effector error at the end of each hold,</text><text x="18" y="420">        controller.stats.summary(): MPC updates, fallbacks, solve/update times, deadline overruns, iterations</text>
+<text x="10" y="458" font-size="9" fill="#5b6672">Numbers 1–15 refer to the sections of this chapter. Planning (6–7) happens inside step 5, while the task object is being constructed,</text>
+<text x="10" y="472" font-size="9" fill="#5b6672">so the robot has not moved yet when the planner runs. The viewer mode replaces run_headless with run_viewer, which calls the same</text>
+<text x="10" y="486" font-size="9" fill="#5b6672">step() ~33 times per displayed frame and sleeps to stay in sync with the wall clock.</text>
+</g></svg>
+<figcaption>Execution flow of <code>main.py --config configs/planning_demo.yaml --headless</code>.</figcaption>
+</figure>
+
+<h2 id="s-t1">Program start-up</h2>
+<p><code>main()</code> (<span class="file">main.py</span>, line 23) defines the command-line options with
+<code>argparse</code>: <code>--config</code>, <code>--environment</code>, <code>--headless</code>,
+<code>--duration</code>, <code>--controller {pid, mpc, ctc, torque_mpc}</code>, <code>--control-rate</code>,
+repeatable <code>--target X Y Z</code>, <code>--planning/--no-planning</code>, <code>--plan-seed</code> and
+<code>--unchecked-direct</code>. Importing <code>main.py</code> already imports the runner, which imports
+every controller, task and planner module, and MuJoCo itself (a compiled C library with Python bindings).</p>
+
+<h2 id="s-t2">Configuration loading</h2>
+<p><code>load_config(path)</code> (<span class="file">simulation/runner.py</span>, line 76) reads the YAML file.
+<span class="file">configs/planning_demo.yaml</span> starts with <code>extends: default.yaml</code>, so the
+default file is loaded first and the demo file is merged over it recursively (<code>_merge</code>), with one
+special rule: the <code>task</code> section is replaced as a whole, not merged. The merged configuration
+contains <code>environment: planning_demo</code>, a <code>cartesian_reach</code> task with a start
+configuration and two targets, a <code>planning</code> section (clearance 0.02 m, RRT budgets, IK seeding,
+<code>exact_box_box: true</code>), <code>controller.type: torque_mpc</code> and, inherited from the default,
+all the torque-MPC weights and the disturbance-observer settings. Command-line options then overwrite
+entries of this dictionary (lines 55–88 of <code>main.py</code>): for example <code>--controller ctc</code> sets
+<code>config["controller"]["type"] = "torque_ctc"</code>, and <code>--no-planning</code> sets
+<code>task.planning.enabled = False</code>.</p>
+
+<h2 id="s-t3">Robot model loading</h2>
+<p><code>SimulationRunner.__init__</code> (runner line 224) first decides which actuator model the controller
+needs: <code>CONTROLLER_ACTUATION["torque_mpc"] = "torque"</code>. It constructs
+<code>Panda(actuation="torque")</code> and passes it to the engine. Inside <code>build_spec</code>
+(<span class="file">simulation/engine.py</span>, line 53) the robot description loads the Menagerie XML as an
+<code>MjSpec</code> (<code>Panda.load_spec</code>), adds the <code>ee_site</code>, and converts actuators 1–7 to
+torque motors: gain 1, no bias (so the applied torque equals the command), command range equal to the
+force range (±87 Nm, ±12 Nm), and the home keyframe's commands set to zero (they were joint angles, which
+would otherwise be interpreted as torques).</p>
+
+<h2 id="s-t4">Environment initialization</h2>
+<p>Still in <code>build_spec</code>, the environment file <span class="file">environments/planning_demo.xml</span>
+is loaded into its own spec; geometry overrides would be applied here (none in this run); the robot's base
+body is attached to a frame at the <code>robot_mount</code> site (0, 0, 0.40), i.e. on the table top; and a
+contact exclusion between <code>link0</code> and <code>table</code> is added because the base rests on the
+table. <code>spec.compile()</code> produces the <code>MjModel</code> (nq = 9 position coordinates: 7 arm joints
+and 2 finger slides; nu = 8 actuators), and <code>MjData</code> holds the changing state. The engine caches
+index arrays and limits and calls <code>reset()</code>, which loads the home keyframe and runs
+<code>mj_forward</code> so every derived quantity (link poses, contacts) is consistent. The scene contains the
+floor, the table (top and four legs) and the wall, a box 0.55 × 0.04 × 0.26 m.</p>
+
+<h2 id="s-t5">Task creation</h2>
+<p><code>_build_task</code> (runner line 291) sees <code>type: cartesian_reach</code> with planning enabled. It
+builds an <code>ArmKinematics</code> object (IK with joint-limit margin 0.05 rad and damping 0.05), then the
+motion planner through <code>MotionPlanner.from_engine</code>, which creates a <code>CollisionChecker</code> on a
+deep copy of the compiled model (Chapter 11). It then constructs
+<code>CartesianReachTask(targets, start, plan=planner.plan_to_position, …)</code>. The task's constructor
+(<span class="file">tasks/reach.py</span>, line 41) immediately calls <code>plan(target, q_from)</code> for each
+target in order, starting from the configured start configuration
+<code>[0.246, 0.621, 0.211, −1.791, 0.089, 1.756, −0.785]</code>, which puts the hand at (0.45, 0.25, 0.50) m on
+the left of the wall. <strong>So planning happens during object construction, before the simulation starts.</strong></p>
+
+<h2 id="s-t6">Inverse kinematics</h2>
+<p><code>plan_to_position</code> (<span class="file">planning/motion_planner.py</span>, line 129) first checks that
+the start configuration is valid, then calls <code>ik_candidates</code> (<span class="file">planning/ik.py</span>).
+That function runs damped-least-squares IK (<code>ArmKinematics.solve_ik</code>) from 22 seeds: the current
+configuration, the rest posture, 8 random perturbations of the current configuration (σ = 0.5 rad) and 12
+uniformly random configurations. Each converged solution (position error below 0.1 mm) is checked by the
+collision checker; valid ones are sorted by weighted joint distance from the start, near-duplicates are
+merged, and at most 4 are kept. Chapter 4 explains the IK mathematics.</p>
+
+<h2 id="s-t7">Motion planning</h2>
+<p>For the first IK candidate the planner calls <code>RRTConnect.plan(q_from, q_goal, seed)</code>
+(<span class="file">planning/rrt_connect.py</span>, line 146). It first checks the straight joint-space edge:
+here it is blocked (the hand would sweep through the wall), which is what the output means by
+"direct edge BLOCKED". The two random trees then grow until they connect (21 nodes for the first target,
+3,910 collision checks including IK validation and shortcutting), the path is reconstructed, and
+<code>shortcut</code> shortens it from 4.39 rad of joint motion to 1.41 rad with 4 vertices (start, two via
+points, goal). Each query gets a deterministic seed: 0 for the first target and 1000 for the second
+(<code>_next_seed</code>). The returned <code>MotionPlan</code> carries the path, the raw path and statistics. If
+planning had failed, the target would be marked <em>rejected</em> with the reason and skipped; the straight
+move is never substituted.</p>
+
+<h2 id="s-t8">Trajectory generation</h2>
+<p>Back in <code>CartesianReachTask</code>, the path's interior vertices become via points: waypoints with zero
+hold time. The goal gets a 1.5 s hold. The task then builds one internal <code>JointTargetTask</code> with
+per-move durations: each planned edge requests <code>segment_time</code> = 1.0 s. For every edge,
+<code>plan_segment</code> (<span class="file">tasks/trajectory.py</span>, line 189) computes the minimum-jerk
+timing along the straight joint line and lengthens it if 90% of the velocity limit, 50% of the acceleration
+limit, 5% of the jerk limit or 80% of the torque limit (checked with inverse dynamics of the controller's
+model at 101 samples) would be exceeded. The reference therefore stops at each via point and moves along
+exactly the edges the collision checker validated. The total duration of this run is 9.0 s (2 × 3 edges
+of ≥ 1 s plus 2 × 1.5 s holds).</p>
+
+<h2 id="s-t9">Controller initialization</h2>
+<p><code>build_controller</code> → <code>build_torque_mpc</code> (runner line 163) creates:</p>
+<ul>
+<li>a <code>MuJoCoPredictionModel</code> on the controller's model with <code>substeps = 10</code> (50 Hz control
+on a 500 Hz simulation, checked by <code>control_substeps</code>);</li>
+<li>a <code>ComputedTorqueController</code> as fallback (plain CTC, no observer);</li>
+<li>a <code>JointDisturbanceObserver</code> with time constant 10 ms (enabled in <code>default.yaml</code>);</li>
+<li>the <code>TorqueMPCController</code> with horizon 25, the weights from the config and the
+<code>reference_preview</code> callable that lets the MPC ask the task for the reference at future times.</li>
+</ul>
+<p>The controller's constructor builds the sparsity pattern of the quadratic program once
+(<code>_build_structure</code>), so later updates only overwrite numbers. Finally <code>runner.reset()</code> puts
+the robot at the task's first waypoint (the start configuration), opens the gripper (command 255) and
+places the red target marker.</p>
+
+<h2 id="s-t10">Repeated control optimization</h2>
+<p><code>run_headless(9.0, before_step=count_contacts)</code> loops 4,500 times. Each iteration calls
+<code>SimulationRunner.step()</code> (runner line 358), which asks the task for the reference at the current
+simulated time and calls <code>controller.compute(q, qd, ref.q, ref.qd, dt, t, qdd_ref)</code>. Inside
+<code>TorqueMPCController.compute</code> (<span class="file">controllers/torque_mpc.py</span>, line 264):</p>
+<ol>
+<li>the observer folds in the newest measurement and updates its disturbance estimate (every step);</li>
+<li>on every 10th call, <code>_update</code> linearizes MuJoCo around the measured state, writes the new
+model and references into the QP, warm-starts OSQP with the previous solution shifted by one interval,
+and solves; the first torque of the solution becomes the held command;</li>
+<li>between updates the held torque is returned, corrected by the change in the disturbance estimate
+since the last update (<code>feedthrough</code>).</li>
+</ol>
+<p>In this run there were 450 updates (9 s × 50 Hz), all solved, with a mean of 37.7 OSQP iterations and a
+mean update time of 4.86 ms against a 20 ms budget. Chapter 8 dissects <code>_update</code>.</p>
+
+<h2 id="s-t11">Applying motor commands</h2>
+<p><code>engine.set_arm_command(tau)</code> clips the seven torques to the actuator command range and writes
+them into <code>data.ctrl</code>. With torque motors, the force MuJoCo applies equals this command. The
+gripper command (255, open) stays constant; nothing in this task closes it.</p>
+
+<h2 id="s-t12">Physics simulation</h2>
+<p><code>engine.step()</code> calls <code>mujoco.mj_step</code>, which computes the forward dynamics (inertia,
+Coriolis and gravity forces, joint damping, armature, actuator forces, contact forces if anything touches)
+and integrates 2 ms forward with the <code>implicitfast</code> integrator (Chapter 5). This is the only way the
+robot moves: the project rule "never set qpos/qvel to produce motion" is enforced by tests
+(<code>test_arm_moves_only_through_actuators</code>).</p>
+
+<h2 id="s-t13">Feedback measurements</h2>
+<p>At the next iteration <code>engine.arm_qpos()</code> and <code>arm_qvel()</code> copy the joint angles and
+velocities out of <code>MjData</code>. These are the controller's measurements; the loop is closed because the
+next command depends on them. They are perfect (no noise) unless the configuration has a
+<code>sensor_noise</code> section, in which case the runner adds seeded Gaussian noise to what the controller
+sees, while metrics still use the true state.</p>
+
+<h2 id="s-t14">Task completion</h2>
+<p>Nothing "finishes" in the control loop: the task simply returns the final waypoint with zero velocity
+after its last segment (for non-looping tasks), and the loop stops after <code>duration</code> simulated seconds
+(by default the task's duration, 9.0 s). There is no success detection inside the loop; success is judged
+afterwards from the log. If a target had been rejected, it would never have entered the reference.</p>
+
+<h2 id="s-t15">Logging and evaluation</h2>
+<p><code>run_headless</code> appends a sample to a <code>RunLog</code> every 10 steps (time, q, q_ref, the
+end-effector position, velocities, the reference acceleration, commands and applied actuator forces), giving
+450 samples. <code>main.py</code> then prints the maximum joint tracking error over the log (rounded to
+4 decimals, it shows 0.0000 rad, i.e. below 0.05 mrad; the planning benchmark measured 31 µrad for torque
+MPC on this scene, <span class="file">docs/research/v0.5-results.md</span> §8), the final configuration and end-effector
+position, the contact count collected by <code>count_contacts</code> every step, the end-effector error at the
+end of each hold, and the MPC statistics from <code>controller.stats.summary()</code>.</p>
+
+<div class="box warning"><span class="lbl">Caution: what "deadline overruns" means in simulation</span>
+<p>The MPC counts an update as an overrun when its wall-clock time exceeds the 20 ms control period. In
+headless mode simulated time does not wait for wall-clock time, so an overrun has <em>no effect</em> on the
+motion: the simulator simply waits for the solver. In viewer mode the loop sleeps only when the simulation
+is ahead of the wall clock (<code>_viewer_loop</code>), so slow updates make the animation run slower than real
+time, but again do not change the physics. Overruns are therefore a <em>warning about real-time feasibility
+on hardware</em>, not a failure in the simulation (Chapter 9).</p></div>
+
+<h2 id="s-tvar">Variations of the run</h2>
+<table id="tab-variations">
+<caption>What changes in the trace for other common invocations.</caption>
+<thead><tr><th>Command</th><th>Difference</th></tr></thead>
+<tbody>
+<tr><td><code>main.py</code> (no arguments)</td><td><code>default.yaml</code>: table scene, three joint waypoints in a loop, PID on position servos; no IK, no planning; opens the viewer.</td></tr>
+<tr><td><code>--controller ctc</code></td><td>Same plan (planning does not depend on the controller); <code>ComputedTorqueController</code> computes torque every 2 ms; no QP.</td></tr>
+<tr><td><code>--no-planning</code></td><td><code>plan = ArmKinematics.plan_target</code>: IK plus a 25-sample straight-path contact check; <code>right_of_wall</code> is rejected ("collision on path: wall-link6") and the robot stays left.</td></tr>
+<tr><td><code>--no-planning --unchecked-direct</code></td><td>Path and torque checks disabled on purpose; the arm drives into the wall (unsafe comparison mode).</td></tr>
+<tr><td><code>--target 0.5 0.2 0.7</code></td><td>Replaces the task with Cartesian reach to the given point(s).</td></tr>
+<tr><td>no <code>--headless</code></td><td><code>run_viewer</code>: MuJoCo's passive viewer, planned paths drawn in green/orange, paced to wall-clock time; the runner joins the viewer's teardown thread on exit to avoid a Windows crash.</td></tr>
+</tbody></table>

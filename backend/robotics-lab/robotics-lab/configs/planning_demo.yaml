@@ -1,0 +1,66 @@
+# v0.5 obstacle-avoidance demonstration: reach over a wall with collision-aware
+# motion planning (RRT-Connect + shortcutting), executed by the torque MPC.
+#
+#   .\.venv\Scripts\python.exe main.py --config configs\planning_demo.yaml                  # viewer, planned
+#   .\.venv\Scripts\python.exe main.py --config configs\planning_demo.yaml --no-planning    # same goals, no planner
+#
+# The start configuration and the targets were found experimentally
+# (docs/research/v0.5-worklog.md): both are collision-free with 20 mm
+# clearance, and the straight joint-space move between them sweeps the hand
+# through the wall. tests/test_planning_demo.py re-checks all of this.
+
+extends: default.yaml
+
+environment: planning_demo  # environments/planning_demo.xml: table + wall
+
+task:
+  type: cartesian_reach
+  move_time: 3.0            # requested duration of an unplanned move (planning disabled)
+  hold_time: 1.5            # seconds holding each target
+  trajectory:               # v0.4 feasibility-checked timing (same as default.yaml)
+    profile: min_jerk
+    velocity_scale: 0.9
+    acceleration_scale: 0.5
+    jerk_scale: 0.05
+    torque_scale: 0.8
+  ik:
+    tolerance: 1.0e-4
+    joint_limit_margin: 0.05
+    damping: 0.05
+  # Start: end effector at (0.45, 0.25, 0.50), left of the wall, gripper hanging down.
+  start: [0.246, 0.621, 0.211, -1.791, 0.089, 1.756, -0.785]
+  targets:
+    - name: right_of_wall
+      position: [0.45, -0.25, 0.50]
+    - name: back_left
+      position: [0.45, 0.25, 0.50]
+  planning:
+    enabled: true
+    seed: 0
+    segment_time: 1.0       # requested s per path edge; lengthened to the trajectory limits
+    clearance: 0.02         # m kept from the environment at every checked configuration
+    cartesian_step: 0.01    # m: max motion of any robot point between edge samples
+    max_joint_step: 0.05    # rad: max joint motion between edge samples
+    exact_box_box: true     # v0.5.2: box-box robot/obstacle pairs via mj_geomDistance (false = v0.5 contacts)
+    joint_limit_margin: 0.05
+    rrt:
+      step_size: 0.3        # weighted joint-space extension step
+      max_time: 5.0         # s per target (all IK postures together)
+      max_nodes: 20000
+      max_iterations: 20000
+      try_direct: true      # use the straight edge when it is valid
+    shortcut:
+      enabled: true
+      iterations: 100
+    ik:
+      random_seeds: 12      # uniformly random IK seeds (besides the current and rest postures)
+      local_seeds: 8        # IK seeds perturbed around the current configuration (sigma 0.5 rad)
+      time_split: true      # each posture gets a fair share of the remaining planning time
+      max_candidates: 4     # collision-free postures attempted per target
+
+controller:
+  type: torque_mpc
+
+viewer:
+  realtime: true
+  show_planned_path: true   # green: executed path, orange: raw RRT path (end-effector curves)

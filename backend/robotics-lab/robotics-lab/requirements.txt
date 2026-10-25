@@ -1,0 +1,13 @@
+# Python 3.13. Versions verified on Windows 11 (2026-10-14).
+# The Franka Panda model is vendored from the official MuJoCo Menagerie GitHub
+# repository in robots/models/franka_emika_panda (see SOURCE.txt), not installed via pip.
+mujoco==3.16.0
+numpy==2.5.4
+scipy==1.18.1
+osqp==1.1.3
+PyYAML==6.0.3
+pytest==9.1.1
+# Optional: benchmark plots (benchmark.py skips them if missing). Added 2026-10-17.
+matplotlib==3.11.2
+# Workbench viewport JPEG encoding and the demo-video renderers (tools/render_*.py). Added 2026-10-19.
+pillow==13.0.0
